@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Spark Canvas - V51 (视觉分层版)</title>
+    <title>Spark Canvas - V48 (自由视界版)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     
@@ -15,33 +15,26 @@
         :root { --bg-color: #1e1e1e; --panel-bg: rgba(45, 45, 45, 0.95); --accent-color: #007AFF; --danger-color: #ff453a; --text-color: #fff; --border-color: #444; }
         
         html, body { 
-            height: 100%; width: 100%; overflow: hidden; 
+            height: 100%; width: 100%; overflow: hidden; /* 彻底禁止原生滚动 */
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
             background-color: var(--bg-color); color: var(--text-color); margin: 0; 
-            touch-action: none; 
+            touch-action: none; /* 全局禁止浏览器处理触摸，全部交给 JS */
         }
         
         #status-indicator { position: fixed; top: 20px; font-size: 12px; color: #666; background: rgba(0,0,0,0.5); padding: 4px 12px; border-radius: 20px; transition: all 0.3s; font-weight: 500; z-index: 10; opacity: 0; pointer-events: none; }
         #status-indicator.visible { opacity: 1; }
         .status-saved { color: #32D74B !important; } .status-saving { color: #FFD700 !important; }
 
-        /* V51: 画布外区域 (桌面) - 深色 + 点阵纹理 */
+        /* 画布容器充满屏幕 */
         #canvas-wrapper { 
             width: 100vw; height: 100vh; 
             display: flex; justify-content: center; align-items: center;
             overflow: hidden;
-            background-color: #121212; 
-            /* 点阵纹理，增加空间感 */
-            background-image: radial-gradient(#333 1px, transparent 1px);
-            background-size: 20px 20px;
         }
         
-        /* V51: 画布容器本身设为透明，让上面的 wrapper 背景透出来 */
         .canvas-container { 
-            background: transparent !important; 
-            /* 取消之前的阴影，因为现在阴影要加在内部的 bgRect 上 */
-            box-shadow: none !important; 
-            border: none !important;
+            box-shadow: 0 0 80px rgba(0,0,0,0.5); 
+            border: 1px solid #333; 
         }
 
         /* 底部工具栏 */
@@ -135,6 +128,7 @@
         .modal-btn.cancel:hover { background: #555; }
         .modal-btn.confirm { background: var(--danger-color); color: white; }
         .modal-btn.confirm:hover { background: #ff5b50; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
         #file-input, #bg-file-input { display: none; }
     </style>
@@ -178,33 +172,34 @@
     <div id="context-menu">
         <div class="menu-header show-header">图层 Layer</div>
         <div class="layer-controls">
-            <div class="layer-btn" onclick="menuAction('top')">⤒</div>
-            <div class="layer-btn" onclick="menuAction('up')">↑</div>
-            <div class="layer-btn" onclick="menuAction('down')">↓</div>
-            <div class="layer-btn" onclick="menuAction('bottom')">⤓</div>
+            <div class="layer-btn" onclick="menuAction('top')" title="置顶">⤒</div>
+            <div class="layer-btn" onclick="menuAction('up')" title="上移">↑</div>
+            <div class="layer-btn" onclick="menuAction('down')" title="下移">↓</div>
+            <div class="layer-btn" onclick="menuAction('bottom')" title="置底">⤓</div>
         </div>
         
-        <div class="menu-header image-menu-item">效果 Effect</div>
+        <div class="menu-header image-menu-item">图片效果 Effect</div>
         <div class="menu-item image-menu-item" onclick="menuAction('flipX')"><span class="menu-icon-span">⇄</span> 水平翻转</div>
         <div class="menu-item image-menu-item" onclick="menuAction('filter-bw')"><span class="menu-icon-span">◐</span> 黑白滤镜</div>
         <div class="menu-item image-menu-item" onclick="menuAction('shadow')"><span class="menu-icon-span">❑</span> 投影</div>
 
-        <div class="menu-header text-menu-item">文字设置</div>
+        <div class="menu-header text-menu-item">文字设置 Text</div>
         <div class="text-colors-container text-menu-item">
-            <div class="text-color-dot" style="background: #000000" onclick="changeTextColor('#000000')"></div>
-            <div class="text-color-dot" style="background: #ffffff" onclick="changeTextColor('#ffffff')"></div>
-            <div class="text-color-dot" style="background: #FFCC00" onclick="changeTextColor('#FFCC00')"></div>
-            <div class="text-color-dot" style="background: #34C759" onclick="changeTextColor('#34C759')"></div>
-            <div class="text-color-dot" style="background: #007AFF" onclick="changeTextColor('#007AFF')"></div>
-            <div class="text-color-dot" style="background: #FF3B30" onclick="changeTextColor('#FF3B30')"></div>
+            <div class="text-color-dot" style="background: #000000" onclick="changeTextColor('#000000')" title="黑"></div>
+            <div class="text-color-dot" style="background: #ffffff" onclick="changeTextColor('#ffffff')" title="白"></div>
+            <div class="text-color-dot" style="background: #FFCC00" onclick="changeTextColor('#FFCC00')" title="黄"></div>
+            <div class="text-color-dot" style="background: #34C759" onclick="changeTextColor('#34C759')" title="绿"></div>
+            <div class="text-color-dot" style="background: #007AFF" onclick="changeTextColor('#007AFF')" title="蓝"></div>
+            <div class="text-color-dot" style="background: #FF3B30" onclick="changeTextColor('#FF3B30')" title="红"></div>
         </div>
         <div class="align-toolbar text-menu-item">
-            <div class="align-btn" onclick="menuAction('align-left')">|←</div>
-            <div class="align-btn" onclick="menuAction('align-center')">→|←</div>
-            <div class="align-btn" onclick="menuAction('align-right')">→|</div>
+            <div class="align-btn" onclick="menuAction('align-left')" title="左对齐">|←</div>
+            <div class="align-btn" onclick="menuAction('align-center')" title="居中">→|←</div>
+            <div class="align-btn" onclick="menuAction('align-right')" title="右对齐">→|</div>
         </div>
         <div class="menu-item text-menu-item" onclick="menuAction('weight-up')"><span class="menu-icon-span">B↑</span> 增加字重</div>
         <div class="menu-item text-menu-item" onclick="menuAction('weight-down')"><span class="menu-icon-span">B↓</span> 缩小字重</div>
+        
         <div class="menu-item text-menu-item" onclick="menuAction('spacing-up')"><span class="menu-icon-span">←→</span> 字间距 +</div>
         <div class="menu-item text-menu-item" onclick="menuAction('spacing-down')"><span class="menu-icon-span">→←</span> 字间距 -</div>
         <div class="menu-item text-menu-item" onclick="menuAction('line-height-up')"><span class="menu-icon-span">↕</span> 行间距 +</div>
@@ -248,6 +243,7 @@
         let screenCount = 1;
         fabric.textureSize = 2048; 
 
+        // 旋转图标
         const rotateIconImg = new Image();
         rotateIconImg.src = 'rotate.png';
         rotateIconImg.onload = function() { if(canvas) canvas.requestRenderAll(); }
@@ -270,8 +266,7 @@
             snapAngle: 90, snapThreshold: 3,
             cornerStyle: 'circle', cornerColor: '#007AFF', borderColor: '#007AFF',
             transparentCorners: false, borderScaleFactor: 2, cornerSize: 10,
-            centeredScaling: false, lockUniScaling: true,
-            lockMovementX: true, lockMovementY: true 
+            centeredScaling: false, lockUniScaling: true
         });
 
         fabric.Object.prototype.controls.mtr = new fabric.Control({
@@ -281,12 +276,11 @@
         });
 
         const canvas = new fabric.Canvas('c', {
-            width: window.innerWidth, height: window.innerHeight, // 画布充满全屏
-            backgroundColor: null, // 透明背景，让下面的wrapper透出来
-            preserveObjectStacking: true, 
+            width: SCREEN_WIDTH * screenCount, height: SCREEN_HEIGHT,
+            backgroundColor: '#ffffff', preserveObjectStacking: true, 
             fireRightClick: true, stopContextMenu: true,
             selection: false, 
-            allowTouchScrolling: false // 禁止原生滚动，全部 JS 接管
+            allowTouchScrolling: false // 禁用原生滚动，我们自己实现 Pan
         });
 
         let gridLines = [];
@@ -300,56 +294,7 @@
         let db; let saveTimeout;
 
         // ==========================================
-        // V51 核心: 实体化“画纸” (Background Rect)
-        // ==========================================
-        
-        let bgRect; // 这是一个真正的 Fabric 对象，用来充当“画纸”
-
-        function updateCanvasBackground() {
-            // 移除旧的背景纸
-            if (bgRect) canvas.remove(bgRect);
-            
-            // 创建新的白纸
-            bgRect = new fabric.Rect({
-                left: 0, 
-                top: 0,
-                width: screenCount * SCREEN_WIDTH,
-                height: SCREEN_HEIGHT,
-                fill: '#ffffff', // 默认白色
-                selectable: false, // 不可选中
-                evented: false, // 不响应事件（点它等于点空白处，触发拖拽画布）
-                shadow: new fabric.Shadow({ color: 'rgba(0,0,0,0.5)', blur: 50, offsetX: 0, offsetY: 10 }) // 阴影增加立体感
-            });
-            
-            canvas.add(bgRect);
-            canvas.sendToBack(bgRect);
-            
-            // 重新画网格线
-            drawGrid();
-        }
-
-        // 修改更换背景颜色的逻辑：改的是 bgRect 的颜色
-        function changeBackgroundColor(color) {
-            if(bgRect) {
-                bgRect.set('fill', color);
-                canvas.requestRenderAll();
-                triggerAutoSave();
-            }
-        }
-
-        // 修改图片背景逻辑：改的是 bgRect 的 pattern
-        function applyPattern(imgSrc) {
-            fabric.util.loadImage(imgSrc, function(img) {
-                if(!img || !bgRect) return;
-                const pattern = new fabric.Pattern({ source: img, repeat: 'repeat' });
-                bgRect.set('fill', pattern);
-                canvas.requestRenderAll();
-                triggerAutoSave();
-            });
-        }
-
-        // ==========================================
-        // V50 复刻的自由视界逻辑 (Infinite Canvas)
+        // V48 复刻的自由视界逻辑 (Infinite Canvas)
         // ==========================================
         
         let isDraggingCanvas = false;
@@ -357,23 +302,21 @@
         let lastPosY = 0;
 
         function initViewport() {
-            // 调整 Canvas 尺寸为全屏
-            canvas.setWidth(window.innerWidth);
-            canvas.setHeight(window.innerHeight);
+            const wrapper = document.getElementById('canvas-wrapper');
+            const wrapperWidth = wrapper.clientWidth;
+            const wrapperHeight = wrapper.clientHeight;
             
-            // 计算初始缩放和位置，让白纸居中
-            const wrapperWidth = window.innerWidth;
-            const wrapperHeight = window.innerHeight;
-            
+            // 初始缩放
             let zoom = (wrapperWidth - 60) / SCREEN_WIDTH;
             if(zoom > 1) zoom = 1; 
             if(zoom < 0.1) zoom = 0.1;
 
             canvas.setZoom(zoom);
             
+            // 居中
             const vpt = canvas.viewportTransform;
-            vpt[4] = (wrapperWidth - (screenCount * SCREEN_WIDTH) * zoom) / 2;
-            vpt[5] = (wrapperHeight - SCREEN_HEIGHT * zoom) / 2;
+            vpt[4] = (wrapperWidth - canvas.width * zoom) / 2;
+            vpt[5] = (wrapperHeight - canvas.height * zoom) / 2;
             
             canvas.requestRenderAll();
         }
@@ -383,26 +326,30 @@
             canvas.setHeight(window.innerHeight);
         });
         
-        // 初始化
         setTimeout(() => {
-            updateCanvasBackground(); // 先造纸
-            initViewport(); // 再居中
+            canvas.setWidth(window.innerWidth);
+            canvas.setHeight(window.innerHeight);
+            initViewport();
         }, 100);
 
         // 1. Mouse/Touch Down
         canvas.on('mouse:down', function(opt) {
             const evt = opt.e;
+            
+            // 判断是否点击了活动的物体
             const target = canvas.findTarget(evt) || opt.target;
             const active = canvas.getActiveObject();
 
-            // 如果点击的是 bgRect，视为点击空白
-            const isTargetPaper = target === bgRect;
-
+            // 逻辑 A: 点中 已选中对象 -> 移动对象
             if (active && target === active) {
                 isDraggingCanvas = false;
-            } else if (target && !isTargetPaper) {
+            }
+            // 逻辑 B: 点中 未选中对象 -> 选中它 (Fabric 自动处理)
+            else if (target) {
                 isDraggingCanvas = false;
-            } else {
+            }
+            // 逻辑 C: 点中 空白处 -> 拖拽画布
+            else {
                 isDraggingCanvas = true;
                 canvas.selection = false; 
                 
@@ -418,8 +365,9 @@
                 if (opt.button === 3) { isDraggingCanvas = false; } else { contextMenu.style.display = 'none'; }
             }
             
-            if (target && !isTargetPaper && evt.type === 'touchstart') {
-                isDraggingCanvas = false; 
+            // 移动端长按呼出菜单
+            if (target && evt.type === 'touchstart') {
+                isDraggingCanvas = false; // 如果按住对象，不拖画布
                 longPressTimer = setTimeout(() => {
                     if (!isObjectMoving) { 
                         canvas.setActiveObject(target);
@@ -452,6 +400,7 @@
                 lastPosX = clientX;
                 lastPosY = clientY;
             } else {
+                // 如果在移动对象，标记一下
                 const active = canvas.getActiveObject();
                 if (active && (active.isMoving || active.isScaling || active.isRotating)) {
                     isObjectMoving = true;
@@ -468,7 +417,7 @@
             canvas.setViewportTransform(canvas.viewportTransform); 
         });
 
-        // 4. Pinch Zoom (双指缩放)
+        // 4. Pinch Zoom
         let initialPinchDistance = 0;
         let initialPinchZoom = 1;
         let initialObjectScale = 1;
@@ -480,9 +429,8 @@
             if (e.touches.length === 2) {
                 isDraggingCanvas = false; 
                 
-                let target = canvas.findTarget(e) || canvas.getActiveObject();
-                if (target === bgRect) target = null; // 背景纸不参与对象缩放
-
+                const target = canvas.findTarget(e) || canvas.getActiveObject();
+                
                 const dx = e.touches[0].clientX - e.touches[1].clientX;
                 const dy = e.touches[0].clientY - e.touches[1].clientY;
                 initialPinchDistance = Math.sqrt(dx * dx + dy * dy);
@@ -548,6 +496,7 @@
             }
         });
 
+        // 5. 鼠标滚轮缩放
         canvas.on('mouse:wheel', function(opt) {
             const delta = opt.e.deltaY;
             let zoom = canvas.getZoom();
@@ -564,7 +513,7 @@
 
         function openContextMenu(opt) {
             const target = opt.target || canvas.getActiveObject();
-            if(!target || target === bgRect) return; // 忽略背景纸
+            if(!target) return;
             
             canvas.setActiveObject(target);
             const type = target.type;
@@ -600,11 +549,14 @@
             bgPanel.style.display = 'none';
         }
 
-        // --- 通用逻辑 ---
-
         function toggleBgPanel() {
             const isVisible = bgPanel.style.display === 'block';
             bgPanel.style.display = isVisible ? 'none' : 'block';
+        }
+
+        function changeBackgroundColor(color) {
+            canvas.setBackgroundImage(null, canvas.renderAll.bind(canvas));
+            canvas.setBackgroundColor(color, () => { canvas.renderAll(); triggerAutoSave(); });
         }
 
         function handleBgFile(files) {
@@ -615,15 +567,23 @@
             document.getElementById('bg-file-input').value = '';
         }
 
+        function applyPattern(imgSrc) {
+            fabric.util.loadImage(imgSrc, function(img) {
+                if(!img) return;
+                const pattern = new fabric.Pattern({ source: img, repeat: 'repeat' });
+                canvas.setBackgroundColor(pattern, () => { canvas.renderAll(); triggerAutoSave(); });
+            });
+        }
+
         function showModal() { confirmModal.style.display = 'block'; }
         function closeModal() { confirmModal.style.display = 'none'; }
         
         function executeClear() {
             canvas.clear(); 
-            // 重置为 1 屏
-            screenCount = 1; 
-            // 重新造纸和布局
-            updateCanvasBackground();
+            canvas.setBackgroundColor('#ffffff', canvas.renderAll.bind(canvas));
+            canvas.setViewportTransform([1, 0, 0, 1, 0, 0]); 
+            screenCount = 1; canvas.setWidth(SCREEN_WIDTH); 
+            drawGrid();
             initViewport(); 
             
             if(db) { const tx = db.transaction(STORE_NAME, "readwrite"); tx.objectStore(STORE_NAME).delete("last_session"); }
@@ -748,9 +708,6 @@
                 case 'weight-up': if (obj.type === 'i-text' || obj.type === 'text') { let current = parseInt(obj.fontWeight) || 600; if(current === 'normal') current = 400; if(current === 'bold') current = 700; let next = FONT_WEIGHTS.find(w => w > current); if (!next) next = FONT_WEIGHTS[FONT_WEIGHTS.length - 1]; obj.set('fontWeight', next); } break;
                 case 'weight-down': if (obj.type === 'i-text' || obj.type === 'text') { let current = parseInt(obj.fontWeight) || 600; if(current === 'normal') current = 400; if(current === 'bold') current = 700; let prev = [...FONT_WEIGHTS].reverse().find(w => w < current); if (!prev) prev = FONT_WEIGHTS[0]; obj.set('fontWeight', prev); } break;
             }
-            // 保持背景纸在底层
-            if(bgRect) canvas.sendToBack(bgRect);
-            
             bringGridToFront(); canvas.renderAll(); triggerAutoSave();
             contextMenu.style.display = 'none';
         }
@@ -765,8 +722,6 @@
         function saveState() {
             if (!db) return;
             statusIndicator.innerText = "保存中..."; statusIndicator.classList.add('visible', 'status-saving');
-            // 注意：bgRect 不要存进去，或者加载时忽略它
-            // 这里我们简单起见存进去，加载时会重新 create
             const json = canvas.toJSON();
             const tx = db.transaction(STORE_NAME, "readwrite");
             tx.objectStore(STORE_NAME).put({ id: "autosave", canvas: json, screenCount: screenCount, updated: new Date().getTime() }, "last_session");
@@ -780,21 +735,9 @@
             tx.objectStore(STORE_NAME).get("last_session").onsuccess = (e) => {
                 const data = e.target.result;
                 if (data) {
-                    screenCount = data.screenCount || 1; 
+                    screenCount = data.screenCount || 1; canvas.setWidth(SCREEN_WIDTH * screenCount);
                     canvas.loadFromJSON(data.canvas, () => {
-                        // 清理可能存在的旧 bgRect (如果存档里有的话)
-                        canvas.getObjects().forEach(obj => {
-                            if (obj.width === screenCount * SCREEN_WIDTH && obj.height === SCREEN_HEIGHT && obj.fill === '#ffffff') {
-                                canvas.remove(obj);
-                            }
-                        });
-                        
-                        // 重建全新的 bgRect
-                        updateCanvasBackground();
-                        
                         canvas.getObjects().forEach(obj => { 
-                            if(obj === bgRect) return; // 跳过背景
-                            
                             if(obj.type === 'image') {
                                 obj.setControlsVisibility({ mt: false, mb: false, ml: false, mr: false });
                                 obj.set('noScaleCache', false); 
@@ -804,16 +747,12 @@
                                 obj.set('objectCaching', false);
                             }
                         });
-                        drawGrid(); 
-                        initViewport(); 
+                        drawGrid(); canvas.renderAll(); 
+                        initViewport(); // 加载后自适应
                         statusIndicator.innerText = "已恢复进度"; statusIndicator.classList.add('visible');
                         setTimeout(() => statusIndicator.classList.remove('visible'), 2000);
                     });
-                } else { 
-                    updateCanvasBackground();
-                    drawGrid(); 
-                    initViewport(); 
-                }
+                } else { drawGrid(); initViewport(); }
             };
         }
         function triggerAutoSave() {
@@ -835,8 +774,8 @@
         }
         function bringGridToFront() { gridLines.forEach(l => l.bringToFront()); }
         
-        function addScreen() { screenCount++; updateCanvasBackground(); canvas.renderAll(); triggerAutoSave(); }
-        function removeScreen() { if (screenCount > 1) { screenCount--; updateCanvasBackground(); canvas.renderAll(); triggerAutoSave(); } }
+        function addScreen() { screenCount++; canvas.setWidth(SCREEN_WIDTH * screenCount); drawGrid(); canvas.renderAll(); triggerAutoSave(); }
+        function removeScreen() { if (screenCount > 1) { screenCount--; canvas.setWidth(SCREEN_WIDTH * screenCount); drawGrid(); canvas.renderAll(); triggerAutoSave(); } }
         
         function handleFiles(files) {
             if (!files) return;
@@ -874,9 +813,6 @@
             
             // 隐藏网格线
             gridLines.forEach(l => l.visible = false);
-            
-            // 确保背景纸在最下面
-            if(bgRect) canvas.sendToBack(bgRect);
             
             canvas.renderAll();
 
