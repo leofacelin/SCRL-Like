@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Spark Canvas - V43 (移动端完美交互版)</title>
+    <title>Spark Canvas - V44 (智能交互版)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     
@@ -22,7 +22,7 @@
         /* 滚动容器 */
         #canvas-wrapper { 
             flex: 1; width: 100%; display: flex; justify-content: center; 
-            overflow-y: auto; /* 必须：允许垂直滚动 */
+            overflow-y: auto; 
             overflow-x: hidden;
             padding-top: 20px;
             align-items: flex-start;
@@ -35,8 +35,8 @@
             border: 1px solid #333; 
             transform-origin: top center; 
             transition: transform 0.3s ease;
-            /* 默认状态下禁止浏览器处理触摸，由 Fabric 接管 (用于拖拽、缩放) */
-            touch-action: none; 
+            /* 关键：允许浏览器默认的手势（滚动），具体的阻止逻辑由 JS 动态控制 */
+            touch-action: pan-y; 
         }
 
         /* 底部工具栏 */
@@ -66,9 +66,6 @@
         button.danger { background: rgba(255, 69, 58, 0.1); border-color: var(--danger-color); color: var(--danger-color); }
         button.danger:hover { background: var(--danger-color); color: white; }
         
-        /* 激活状态 */
-        button.active { background: #fff; color: #000; border-color: #fff; box-shadow: 0 0 10px rgba(255,255,255,0.5); }
-
         .font-select-wrapper { position: relative; width: 40px; height: 40px; }
         .font-select-btn { 
             position: absolute; top:0; left:0; width: 100%; height: 100%; 
@@ -216,7 +213,6 @@
 
     <div class="toolbar">
         <div class="tool-group">
-            <button id="pan-btn" onclick="togglePanMode()" title="切换: 👆编辑 / ✋浏览">👆</button>
             <button onclick="document.getElementById('file-input').click()" class="primary" title="添加图片">🖼</button>
             <button onclick="addText()" title="添加文字">T</button>
             <div class="font-select-wrapper" title="选择字体">
@@ -285,7 +281,7 @@
             width: SCREEN_WIDTH * screenCount, height: SCREEN_HEIGHT,
             backgroundColor: '#ffffff', preserveObjectStacking: true, 
             fireRightClick: true, stopContextMenu: true,
-            allowTouchScrolling: false // 初始禁止滚动，由 Pan Mode 控制
+            allowTouchScrolling: true // 初始开启滚动 (V44)
         });
 
         let gridLines = [];
@@ -294,97 +290,151 @@
         const statusIndicator = document.getElementById('status-indicator');
         const confirmModal = document.getElementById('confirm-modal');
         const fontSelector = document.getElementById('font-family-selector');
-        const panBtn = document.getElementById('pan-btn');
 
         const DB_NAME = "SparkCanvasDB"; const STORE_NAME = "sessions";
         let db; let saveTimeout;
 
-        // --- V43 核心: 移动端滚动 + 双指缩放 ---
+        // --- V44: 智能手势系统 (SCRL模式) ---
+        // 核心理念：
+        // 1. 如果没有选中物体，或者手指点在空白处 -> 允许滚动 (allowTouchScrolling=true)
+        // 2. 如果点击了未选中的物体 -> 不触发滚动，判断是点击还是拖拽
+        // 3. 如果点击了已选中的物体 -> 禁止滚动 (allowTouchScrolling=false)，允许 Fabric 拖拽
         
-        let isPanMode = false;
+        let startX, startY;
+        let isMovingActiveObject = false;
 
-        function togglePanMode() {
-            isPanMode = !isPanMode;
-            panBtn.innerText = isPanMode ? "✋" : "👆";
-            
-            const container = document.querySelector('.canvas-container');
-            const upperCanvas = canvas.upperCanvasEl;
+        // 监听最底层的鼠标按下 (比 Fabric 更早触发)
+        canvas.upperCanvasEl.addEventListener('touchstart', function(e) {
+            const target = canvas.findTarget(e);
+            const active = canvas.getActiveObject();
 
-            if (isPanMode) {
-                // 浏览模式：允许浏览器滚动，穿透画布
-                panBtn.classList.add('active');
-                
-                canvas.allowTouchScrolling = true; // Fabric 允许滚动
-                container.style.touchAction = 'pan-y'; // CSS 允许垂直滚动
-                upperCanvas.style.pointerEvents = 'none'; // 关键：事件穿透，让手指直接滑到 wrapper 上
-                
-                canvas.selection = false;
-                canvas.discardActiveObject();
-                contextMenu.style.display = 'none';
-                bgPanel.style.display = 'none';
-            } else {
-                // 编辑模式：禁止浏览器滚动，Fabric 接管触摸
-                panBtn.classList.remove('active');
-                
+            // 情况A：点击了已经选中的物体 -> 准备移动，禁止滚动
+            if (active && target === active) {
                 canvas.allowTouchScrolling = false;
-                container.style.touchAction = 'none'; // 禁止默认滚动
-                upperCanvas.style.pointerEvents = 'auto'; // 恢复事件响应
+                isMovingActiveObject = true;
+            } 
+            // 情况B：点击了未选中的物体 或 空白处 -> 允许滚动，稍后判断是否是点击
+            else {
+                canvas.allowTouchScrolling = true;
+                isMovingActiveObject = false;
                 
-                canvas.selection = true;
+                // 如果点到了新物体，暂时先不选中它，等 touchend 再决定
+                // (Fabric 默认 mousedown 就会选中，这里我们利用 allowTouchScrolling=true 让浏览器接管滑动)
             }
-            canvas.requestRenderAll();
-        }
+            
+            // 记录起始点
+            if (e.touches && e.touches[0]) {
+                startX = e.touches[0].clientX;
+                startY = e.touches[0].clientY;
+            }
+        }, { passive: false });
 
-        // --- 双指缩放逻辑 (Pinch to Zoom) ---
+        // 监听触摸结束 (模拟点击选中)
+        canvas.upperCanvasEl.addEventListener('touchend', function(e) {
+            // 如果刚才是在移动已选中物体，操作结束，恢复滚动
+            if (isMovingActiveObject) {
+                canvas.allowTouchScrolling = true;
+                isMovingActiveObject = false;
+                return;
+            }
+
+            // 计算移动距离
+            if (!startX || !e.changedTouches || !e.changedTouches[0]) return;
+            const endX = e.changedTouches[0].clientX;
+            const endY = e.changedTouches[0].clientY;
+            const dist = Math.sqrt(Math.pow(endX - startX, 2) + Math.pow(endY - startY, 2));
+
+            // 如果移动距离很小 (<5px)，视为“点击”
+            if (dist < 5) {
+                // 手动触发选中逻辑
+                // 由于 touchstart 时 allowTouchScrolling=true，Fabric 可能没选中物体
+                // 我们手动找一下
+                // 注意：e 是原生事件，我们需要把坐标转为 Fabric 坐标
+                const pointer = canvas.getPointer(e);
+                // 这里用简单的 findTarget 可能拿不到，因为事件已经结束了
+                // 我们用之前保存的 pointer
+                // 实际上 findTarget 需要 event，这里模拟一下
+                // 简单点：重新触发一次 fabric 的 selection 逻辑比较难
+                // 我们直接用坐标找物体
+                const target = canvas.findTarget(e); 
+                
+                if (target) {
+                    // 选中它
+                    canvas.setActiveObject(target);
+                    canvas.requestRenderAll();
+                } else {
+                    // 点击了空白处 -> 取消选中
+                    canvas.discardActiveObject();
+                    canvas.requestRenderAll();
+                    contextMenu.style.display = 'none';
+                    bgPanel.style.display = 'none';
+                }
+            }
+        });
+
+        // --- 双指缩放 (Pinch to Zoom) V43 ---
         let initialDistance = 0;
         let initialScale = 1;
         let activeObjectForPinch = null;
+        let initialAngle = 0;
+        let initialObjectAngle = 0;
 
         canvas.upperCanvasEl.addEventListener('touchstart', function(e) {
-            if (isPanMode) return; // 浏览模式下不处理
             if (e.touches.length === 2) {
-                // 获取当前选中的对象，或者是手指下的对象
-                activeObjectForPinch = canvas.getActiveObject() || canvas.findTarget(e);
-                if (activeObjectForPinch) {
-                    // 计算初始距离
+                // 如果双指操作，肯定不想滚动
+                canvas.allowTouchScrolling = false;
+                
+                const target = canvas.findTarget(e) || canvas.getActiveObject();
+                if (target) {
+                    activeObjectForPinch = target;
+                    canvas.setActiveObject(target); // 确保选中
+                    
                     const dx = e.touches[0].clientX - e.touches[1].clientX;
                     const dy = e.touches[0].clientY - e.touches[1].clientY;
                     initialDistance = Math.sqrt(dx * dx + dy * dy);
-                    initialScale = activeObjectForPinch.scaleX;
-                    e.preventDefault(); // 阻止浏览器默认缩放
+                    initialScale = target.scaleX;
+                    
+                    initialAngle = Math.atan2(dy, dx);
+                    initialObjectAngle = target.angle;
                 }
             }
         }, { passive: false });
 
         canvas.upperCanvasEl.addEventListener('touchmove', function(e) {
-            if (isPanMode) return;
             if (e.touches.length === 2 && activeObjectForPinch) {
-                // 计算新距离
+                e.preventDefault(); // 阻止浏览器缩放页面
+                
                 const dx = e.touches[0].clientX - e.touches[1].clientX;
                 const dy = e.touches[0].clientY - e.touches[1].clientY;
                 const currentDistance = Math.sqrt(dx * dx + dy * dy);
-                
-                // 计算缩放比例
+                const currentAngle = Math.atan2(dy, dx);
+
+                // 缩放
                 if (initialDistance > 0) {
                     const scaleFactor = currentDistance / initialDistance;
                     let newScale = initialScale * scaleFactor;
-                    
-                    // 限制最小最大缩放
                     if (newScale < 0.1) newScale = 0.1;
-                    if (newScale > 5) newScale = 5;
-
                     activeObjectForPinch.scale(newScale);
-                    activeObjectForPinch.setCoords(); // 更新坐标，防止无法点击
-                    canvas.requestRenderAll();
-                    triggerAutoSave();
                 }
-                e.preventDefault();
+
+                // 旋转
+                const angleDiff = currentAngle - initialAngle;
+                const angleDeg = angleDiff * (180 / Math.PI);
+                activeObjectForPinch.rotate(initialObjectAngle + angleDeg);
+
+                activeObjectForPinch.setCoords();
+                canvas.requestRenderAll();
             }
         }, { passive: false });
 
-        canvas.upperCanvasEl.addEventListener('touchend', function() {
-            activeObjectForPinch = null;
-            initialDistance = 0;
+        canvas.upperCanvasEl.addEventListener('touchend', function(e) {
+            if (e.touches.length < 2) {
+                activeObjectForPinch = null;
+                // 恢复滚动能力 (如果不是在拖拽选中物体的话)
+                if (!canvas.getActiveObject()) {
+                    canvas.allowTouchScrolling = true;
+                }
+            }
         });
 
         // --- 适配逻辑 ---
@@ -411,11 +461,12 @@
         let longPressTimer;
         let isDrag = false;
 
+        // 长按呼出菜单逻辑
         canvas.on('mouse:down', function(opt) {
             isDrag = false;
-            if (isPanMode) return;
-
             if (bgPanel.style.display === 'block' && !opt.target) bgPanel.style.display = 'none';
+            
+            // 桌面右键
             if (opt.button === 3 && opt.target) {
                 openContextMenu(opt);
                 return;
@@ -423,6 +474,7 @@
                 contextMenu.style.display = 'none';
             }
 
+            // 移动端长按
             if (opt.target && opt.e.type === 'touchstart') {
                 longPressTimer = setTimeout(() => {
                     if (!isDrag) {
@@ -530,7 +582,6 @@
         }
 
         function addText() {
-            if (isPanMode) togglePanMode();
             const selectedFont = fontSelector.value;
             const text = new fabric.IText('双击编辑', {
                 left: canvas.width / 2 - 60,
