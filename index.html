@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Spark Canvas - V49 (视觉分层版)</title>
+    <title>Spark Canvas - V50 (无限视界+视觉分层)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     
@@ -14,49 +14,37 @@
     <style>
         :root { --bg-color: #1e1e1e; --panel-bg: rgba(45, 45, 45, 0.95); --accent-color: #007AFF; --danger-color: #ff453a; --text-color: #fff; --border-color: #444; }
         
+        /* 核心交互设定：禁止浏览器接管手势，全部交给 JS */
         html, body { 
             height: 100%; width: 100%; overflow: hidden; 
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
-            background-color: var(--bg-color); color: var(--text-color); margin: 0; 
-            overscroll-behavior: none; 
+            background-color: #121212; /* 全局深色底 */
+            color: var(--text-color); margin: 0; 
+            touch-action: none; /* 关键：禁止原生缩放和滚动 */
         }
         
         #status-indicator { position: fixed; top: 20px; font-size: 12px; color: #666; background: rgba(0,0,0,0.5); padding: 4px 12px; border-radius: 20px; transition: all 0.3s; font-weight: 500; z-index: 10; opacity: 0; pointer-events: none; }
         #status-indicator.visible { opacity: 1; }
         .status-saved { color: #32D74B !important; } .status-saving { color: #FFD700 !important; }
 
-        /* V49: 优化工作台背景，增加点阵纹理，区分画布与背景 */
+        /* 画布容器：无限视界容器 */
         #canvas-wrapper { 
-            height: 100%; width: 100%; 
-            overflow: auto; 
-            display: flex; 
-            align-items: flex-start; justify-content: center; 
-            padding: 40px; /* 增加边距，让画布更明显 */
-            padding-bottom: 120px;
-            box-sizing: border-box;
-            -webkit-overflow-scrolling: touch;
+            width: 100vw; height: 100vh; 
+            display: flex; justify-content: center; align-items: center;
+            overflow: hidden;
             
-            /* 深色点阵背景 */
-            background-color: #121212;
-            background-image: radial-gradient(#333 1px, transparent 1px);
+            /* V50 新增：深色点阵纹理背景 */
+            background-color: #1a1a1a;
+            background-image: radial-gradient(#444 1px, transparent 1px);
             background-size: 20px 20px;
         }
         
-        /* V49: 强化画布容器的视觉边界 */
         .canvas-container { 
-            /* 强阴影 + 微弱白边，模拟纸张 */
-            box-shadow: 0 10px 60px rgba(0,0,0,0.8); 
-            border: 1px solid rgba(255,255,255,0.1); 
-            background-color: #ffffff; /* 确保未加载时也是白的 */
-            
-            transform-origin: top center; 
-            transition: transform 0.3s ease;
-            margin: auto; 
-            touch-action: pan-y !important; 
+            /* V50 新增：画布的实体感 */
+            box-shadow: 0 0 50px rgba(0,0,0,0.5); /* 柔和阴影 */
+            border: 1px solid rgba(255,255,255,0.1); /* 微弱描边 */
+            background-color: #ffffff; /* 确保画布本身是白的 */
         }
-
-        body.dragging-mode .canvas-container { touch-action: none !important; }
-        body.dragging-mode #canvas-wrapper { overflow: hidden !important; }
 
         /* 底部工具栏 */
         .toolbar { 
@@ -155,10 +143,7 @@
 </head>
 <body>
     <div id="status-indicator">准备就绪</div>
-    
-    <div id="canvas-wrapper">
-        <canvas id="c"></canvas>
-    </div>
+    <div id="canvas-wrapper"><canvas id="c"></canvas></div>
 
     <div id="bg-panel">
         <div class="panel-title">背景设置</div>
@@ -288,8 +273,7 @@
             snapAngle: 90, snapThreshold: 3,
             cornerStyle: 'circle', cornerColor: '#007AFF', borderColor: '#007AFF',
             transparentCorners: false, borderScaleFactor: 2, cornerSize: 10,
-            centeredScaling: false, lockUniScaling: true,
-            lockMovementX: true, lockMovementY: true 
+            centeredScaling: false, lockUniScaling: true
         });
 
         fabric.Object.prototype.controls.mtr = new fabric.Control({
@@ -302,8 +286,8 @@
             width: SCREEN_WIDTH * screenCount, height: SCREEN_HEIGHT,
             backgroundColor: '#ffffff', preserveObjectStacking: true, 
             fireRightClick: true, stopContextMenu: true,
-            allowTouchScrolling: true,
-            selection: false
+            selection: false, 
+            allowTouchScrolling: false // 关键：JS接管滚动
         });
 
         let gridLines = [];
@@ -317,152 +301,213 @@
         let db; let saveTimeout;
 
         // ==========================================
-        // V49 逻辑优化：高亮显示 + 交互控制
+        // V50: 自由视界 + 视觉分层
         // ==========================================
         
-        // 核心手势逻辑
-        canvas.upperCanvasEl.addEventListener('touchstart', function(e) {
+        let isDraggingCanvas = false;
+        let lastPosX = 0;
+        let lastPosY = 0;
+
+        function initViewport() {
+            const wrapper = document.getElementById('canvas-wrapper');
+            const wrapperWidth = wrapper.clientWidth;
+            const wrapperHeight = wrapper.clientHeight;
+            
+            // 初始缩放：稍微留边距
+            let zoom = (wrapperWidth - 60) / SCREEN_WIDTH;
+            if(zoom > 1) zoom = 1; 
+            if(zoom < 0.1) zoom = 0.1;
+
+            canvas.setZoom(zoom);
+            
+            // 居中
+            const vpt = canvas.viewportTransform;
+            vpt[4] = (wrapperWidth - canvas.width * zoom) / 2;
+            vpt[5] = (wrapperHeight - canvas.height * zoom) / 2;
+            if(vpt[5] < 30) vpt[5] = 30; // 顶部留空
+            
+            canvas.requestRenderAll();
+        }
+        
+        window.addEventListener('resize', () => {
+            // 可选：resize 时是否重置？暂不重置，保留用户视角
+        });
+        setTimeout(initViewport, 100);
+
+        // 1. Mouse/Touch Down
+        canvas.on('mouse:down', function(opt) {
+            const evt = opt.e;
+            const target = canvas.findTarget(evt) || opt.target;
             const active = canvas.getActiveObject();
-            const target = canvas.findTarget(e);
 
+            // 逻辑 A: 点中 已选中对象 -> 移动对象
             if (active && target === active) {
-                // 点中已选中对象 -> 编辑模式
-                canvas.allowTouchScrolling = false;
-                document.body.classList.add('dragging-mode');
+                isDraggingCanvas = false;
+            }
+            // 逻辑 B: 点中 未选中对象 -> 选中它 (Fabric 自动处理)
+            else if (target) {
+                isDraggingCanvas = false;
+            }
+            // 逻辑 C: 点中 空白处 -> 拖拽画布
+            else {
+                isDraggingCanvas = true;
+                canvas.selection = false; 
+                
+                if (evt.type === 'touchstart') {
+                    lastPosX = evt.touches[0].clientX;
+                    lastPosY = evt.touches[0].clientY;
+                } else {
+                    lastPosX = evt.clientX;
+                    lastPosY = evt.clientY;
+                }
+                
+                if (bgPanel.style.display === 'block') bgPanel.style.display = 'none';
+                if (opt.button === 3) { isDraggingCanvas = false; } else { contextMenu.style.display = 'none'; }
+            }
+            
+            // 长按菜单
+            if (target && evt.type === 'touchstart') {
+                isDraggingCanvas = false; 
+                longPressTimer = setTimeout(() => {
+                    if (!isObjectMoving) { 
+                        canvas.setActiveObject(target);
+                        openContextMenu(opt);
+                    }
+                }, 500);
+            }
+        });
+
+        // 2. Mouse/Touch Move
+        let isObjectMoving = false;
+        canvas.on('mouse:move', function(opt) {
+            if (isDraggingCanvas) {
+                const evt = opt.e;
+                let clientX, clientY;
+                
+                if (evt.type === 'touchmove') {
+                    clientX = evt.touches[0].clientX;
+                    clientY = evt.touches[0].clientY;
+                } else {
+                    clientX = evt.clientX;
+                    clientY = evt.clientY;
+                }
+                
+                const deltaX = clientX - lastPosX;
+                const deltaY = clientY - lastPosY;
+                
+                canvas.relativePan({ x: deltaX, y: deltaY });
+                
+                lastPosX = clientX;
+                lastPosY = clientY;
             } else {
-                // 其他情况 -> 滚动模式
-                canvas.allowTouchScrolling = true;
-                document.body.classList.remove('dragging-mode');
-            }
-        }, { passive: false });
-
-        canvas.on('selection:created', (e) => {
-            if(e.selected && e.selected[0]) {
-                e.selected[0].set({ lockMovementX: false, lockMovementY: false });
+                const active = canvas.getActiveObject();
+                if (active && (active.isMoving || active.isScaling || active.isRotating)) {
+                    isObjectMoving = true;
+                    clearTimeout(longPressTimer);
+                }
             }
         });
 
-        canvas.on('selection:updated', (e) => {
-            if(e.selected && e.selected[0]) {
-                e.selected[0].set({ lockMovementX: false, lockMovementY: false });
-            }
+        // 3. Mouse/Touch Up
+        canvas.on('mouse:up', function(opt) {
+            isDraggingCanvas = false;
+            isObjectMoving = false;
+            clearTimeout(longPressTimer);
+            canvas.setViewportTransform(canvas.viewportTransform); 
         });
 
-        canvas.on('selection:cleared', (e) => {
-            canvas.allowTouchScrolling = true;
-            document.body.classList.remove('dragging-mode');
-            if(e.deselected && e.deselected[0]) {
-                e.deselected[0].set({ lockMovementX: true, lockMovementY: true });
-            }
-            canvas.forEachObject(o => o.set({ lockMovementX: true, lockMovementY: true }));
-            contextMenu.style.display = 'none';
-            bgPanel.style.display = 'none';
-        });
-
-        // 双指缩放逻辑 (保持不变，非常好用)
-        let initialDistance = 0;
-        let initialScale = 1;
-        let activeObjectForPinch = null;
-        let initialAngle = 0;
+        // 4. Pinch Zoom (双指缩放画布/物体)
+        let initialPinchDistance = 0;
+        let initialPinchZoom = 1;
+        let initialObjectScale = 1;
         let initialObjectAngle = 0;
+        let initialAngle = 0; // 声明 initialAngle
+        let pinchMode = null; 
 
         canvas.upperCanvasEl.addEventListener('touchstart', function(e) {
             if (e.touches.length === 2) {
-                canvas.allowTouchScrolling = false;
-                document.body.classList.add('dragging-mode');
-
+                isDraggingCanvas = false; 
+                
                 const target = canvas.findTarget(e) || canvas.getActiveObject();
-                if (target) {
-                    activeObjectForPinch = target;
-                    target.set({ lockMovementX: false, lockMovementY: false });
-                    canvas.setActiveObject(target);
-                    
-                    const dx = e.touches[0].clientX - e.touches[1].clientX;
-                    const dy = e.touches[0].clientY - e.touches[1].clientY;
-                    initialDistance = Math.sqrt(dx * dx + dy * dy);
-                    initialScale = target.scaleX;
-                    initialAngle = Math.atan2(dy, dx);
+                
+                const dx = e.touches[0].clientX - e.touches[1].clientX;
+                const dy = e.touches[0].clientY - e.touches[1].clientY;
+                initialPinchDistance = Math.sqrt(dx * dx + dy * dy);
+
+                if (target && target === canvas.getActiveObject()) {
+                    pinchMode = 'object';
+                    initialObjectScale = target.scaleX;
                     initialObjectAngle = target.angle;
+                    initialAngle = Math.atan2(dy, dx);
+                } else {
+                    pinchMode = 'canvas';
+                    initialPinchZoom = canvas.getZoom();
                 }
             }
         }, { passive: false });
 
         canvas.upperCanvasEl.addEventListener('touchmove', function(e) {
-            if (e.touches.length === 2 && activeObjectForPinch) {
+            if (e.touches.length === 2) {
                 e.preventDefault(); 
+                
                 const dx = e.touches[0].clientX - e.touches[1].clientX;
                 const dy = e.touches[0].clientY - e.touches[1].clientY;
                 const currentDistance = Math.sqrt(dx * dx + dy * dy);
-                const currentAngle = Math.atan2(dy, dx);
+                
+                if (initialPinchDistance <= 0) return;
 
-                if (initialDistance > 0) {
-                    const scaleFactor = currentDistance / initialDistance;
-                    let newScale = initialScale * scaleFactor;
-                    if (newScale < 0.1) newScale = 0.1;
-                    activeObjectForPinch.scale(newScale);
+                if (pinchMode === 'canvas') {
+                    const scale = currentDistance / initialPinchDistance;
+                    let newZoom = initialPinchZoom * scale;
+                    if (newZoom > 5) newZoom = 5;
+                    if (newZoom < 0.1) newZoom = 0.1;
+                    
+                    const centerPoint = new fabric.Point(
+                        (e.touches[0].clientX + e.touches[1].clientX) / 2,
+                        (e.touches[0].clientY + e.touches[1].clientY) / 2
+                    );
+                    
+                    canvas.zoomToPoint({ x: centerPoint.x, y: centerPoint.y }, newZoom);
+                    
+                } else if (pinchMode === 'object') {
+                    const target = canvas.getActiveObject();
+                    if(target) {
+                        const scaleFactor = currentDistance / initialPinchDistance;
+                        let newScale = initialObjectScale * scaleFactor;
+                        if(newScale < 0.1) newScale = 0.1;
+                        target.scale(newScale);
+                        
+                        const currentAngle = Math.atan2(dy, dx);
+                        const angleDiff = currentAngle - initialAngle;
+                        const angleDeg = angleDiff * (180 / Math.PI);
+                        target.rotate(initialObjectAngle + angleDeg);
+                        
+                        target.setCoords();
+                        canvas.requestRenderAll();
+                    }
                 }
-
-                const angleDiff = currentAngle - initialAngle;
-                const angleDeg = angleDiff * (180 / Math.PI);
-                activeObjectForPinch.rotate(initialObjectAngle + angleDeg);
-
-                activeObjectForPinch.setCoords();
-                canvas.requestRenderAll();
             }
         }, { passive: false });
 
         canvas.upperCanvasEl.addEventListener('touchend', function(e) {
             if (e.touches.length < 2) {
-                activeObjectForPinch = null;
+                pinchMode = null;
             }
         });
 
-        // 适配逻辑
-        function adjustZoom() {
-            const windowWidth = window.innerWidth;
-            if (windowWidth < 560) {
-                const scale = (windowWidth - 80) / SCREEN_WIDTH; // 留出更多边距 (80px)
-                const container = document.querySelector('.canvas-container');
-                if (container) {
-                    container.style.transform = `scale(${scale})`;
-                    const wrapper = document.getElementById('canvas-wrapper');
-                    wrapper.style.height = '100%'; 
-                }
-            } else {
-                const container = document.querySelector('.canvas-container');
-                if (container) container.style.transform = 'none';
-            }
-        }
-        window.addEventListener('resize', adjustZoom);
-        setTimeout(adjustZoom, 100);
+        canvas.on('mouse:wheel', function(opt) {
+            const delta = opt.e.deltaY;
+            let zoom = canvas.getZoom();
+            zoom *= 0.999 ** delta;
+            if (zoom > 5) zoom = 5;
+            if (zoom < 0.1) zoom = 0.1;
+            canvas.zoomToPoint({ x: opt.e.offsetX, y: opt.e.offsetY }, zoom);
+            opt.e.preventDefault();
+            opt.e.stopPropagation();
+        });
 
+        // 长按逻辑变量
         let longPressTimer;
-        let isDrag = false;
-
-        // 长按呼出菜单
-        canvas.on('mouse:down', function(opt) {
-            isDrag = false;
-            if (bgPanel.style.display === 'block' && !opt.target) bgPanel.style.display = 'none';
-            
-            if (opt.button === 3 && opt.target) {
-                openContextMenu(opt);
-                return;
-            } else {
-                contextMenu.style.display = 'none';
-            }
-
-            if (opt.target && opt.e.type === 'touchstart') {
-                longPressTimer = setTimeout(() => {
-                    if (!isDrag) {
-                        canvas.setActiveObject(opt.target);
-                        openContextMenu(opt);
-                    }
-                }, 500); 
-            }
-        });
-
-        canvas.on('mouse:move', function() { isDrag = true; clearTimeout(longPressTimer); });
-        canvas.on('mouse:up', function() { clearTimeout(longPressTimer); });
 
         function openContextMenu(opt) {
             const target = opt.target || canvas.getActiveObject();
@@ -532,10 +577,15 @@
 
         function showModal() { confirmModal.style.display = 'block'; }
         function closeModal() { confirmModal.style.display = 'none'; }
+        
         function executeClear() {
-            canvas.clear(); canvas.setBackgroundColor('#ffffff', canvas.renderAll.bind(canvas));
-            screenCount = 1; canvas.setWidth(SCREEN_WIDTH); drawGrid();
-            adjustZoom();
+            canvas.clear(); 
+            canvas.setBackgroundColor('#ffffff', canvas.renderAll.bind(canvas));
+            canvas.setViewportTransform([1, 0, 0, 1, 0, 0]); 
+            screenCount = 1; canvas.setWidth(SCREEN_WIDTH); 
+            drawGrid();
+            initViewport(); 
+            
             if(db) { const tx = db.transaction(STORE_NAME, "readwrite"); tx.objectStore(STORE_NAME).delete("last_session"); }
             statusIndicator.innerText = "画布已重置"; statusIndicator.classList.add('visible');
             closeModal();
@@ -561,10 +611,12 @@
         }
 
         function addText() {
+            // 获取当前视图中心
+            const center = canvas.getVpCenter();
             const selectedFont = fontSelector.value;
             const text = new fabric.IText('双击编辑', {
-                left: canvas.width / 2 - 60,
-                top: window.scrollY + 300, 
+                left: center.x,
+                top: center.y, 
                 fontFamily: selectedFont, 
                 fontWeight: 600, 
                 fill: '#000000', 
@@ -574,9 +626,7 @@
                 textAlign: 'left',
                 charSpacing: 0,
                 shadow: null,
-                objectCaching: false,
-                lockMovementX: false, 
-                lockMovementY: false
+                objectCaching: false 
             });
             text.setControlsVisibility({ mt: false, mb: false, ml: false, mr: false });
             canvas.add(text);
@@ -633,8 +683,7 @@
                     obj.clone(function(cloned) {
                         canvas.discardActiveObject();
                         cloned.set({ 
-                            left: obj.left + 20, top: obj.top + 20, evented: true,
-                            lockMovementX: false, lockMovementY: false
+                            left: obj.left + 20, top: obj.top + 20, evented: true
                         });
                         if(cloned.type === 'i-text' || cloned.type === 'text') cloned.set('objectCaching', false);
                         if (cloned.type === 'activeSelection') {
@@ -698,15 +747,13 @@
                                 obj.set('shadow', null);
                                 obj.set('objectCaching', false);
                             }
-                            // V49: 初始加载时全部锁定
-                            obj.set({ lockMovementX: true, lockMovementY: true });
                         });
                         drawGrid(); canvas.renderAll(); 
-                        adjustZoom();
+                        initViewport(); 
                         statusIndicator.innerText = "已恢复进度"; statusIndicator.classList.add('visible');
                         setTimeout(() => statusIndicator.classList.remove('visible'), 2000);
                     });
-                } else { drawGrid(); adjustZoom(); }
+                } else { drawGrid(); initViewport(); }
             };
         }
         function triggerAutoSave() {
@@ -727,19 +774,21 @@
             bringGridToFront();
         }
         function bringGridToFront() { gridLines.forEach(l => l.bringToFront()); }
-        function addScreen() { screenCount++; canvas.setWidth(SCREEN_WIDTH * screenCount); drawGrid(); canvas.renderAll(); triggerAutoSave(); adjustZoom(); }
-        function removeScreen() { if (screenCount > 1) { screenCount--; canvas.setWidth(SCREEN_WIDTH * screenCount); drawGrid(); canvas.renderAll(); triggerAutoSave(); adjustZoom(); } }
+        
+        function addScreen() { screenCount++; canvas.setWidth(SCREEN_WIDTH * screenCount); drawGrid(); canvas.renderAll(); triggerAutoSave(); }
+        function removeScreen() { if (screenCount > 1) { screenCount--; canvas.setWidth(SCREEN_WIDTH * screenCount); drawGrid(); canvas.renderAll(); triggerAutoSave(); } }
+        
         function handleFiles(files) {
             if (!files) return;
+            const center = canvas.getVpCenter();
             Array.from(files).forEach(file => {
                 const reader = new FileReader();
                 reader.onload = (f) => {
                     fabric.Image.fromURL(f.target.result, (img) => {
                         if (img.width > SCREEN_WIDTH) img.scaleToWidth(SCREEN_WIDTH * 0.8);
                         img.set({ 
-                            left: (canvas.width - img.getScaledWidth()) / 2 + (Math.random() * 40 - 20), 
-                            top: (canvas.height - img.getScaledHeight()) / 2 + (Math.random() * 40 - 20),
-                            lockMovementX: false, lockMovementY: false
+                            left: center.x - (img.getScaledWidth()/2) + (Math.random() * 40 - 20), 
+                            top: center.y - (img.getScaledHeight()/2) + (Math.random() * 40 - 20)
                         });
                         img.setControlsVisibility({ mt: false, mb: false, ml: false, mr: false });
                         canvas.add(img); canvas.setActiveObject(img); bringGridToFront(); triggerAutoSave();
@@ -753,23 +802,41 @@
         function exportSlicesZip() {
             if (typeof JSZip === 'undefined') { alert("ZIP 库未加载，请检查网络或刷新重试。"); return; }
             statusIndicator.innerText = "正在打包..."; statusIndicator.classList.add('visible', 'status-saving');
+            
+            const originalVpt = canvas.viewportTransform.slice();
+            const originalWidth = canvas.width;
+            const originalHeight = canvas.height;
+
+            canvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
+            canvas.setWidth(SCREEN_WIDTH * screenCount);
+            canvas.setHeight(SCREEN_HEIGHT);
+            gridLines.forEach(l => l.visible = false);
+            canvas.renderAll();
+
             try {
                 const zip = new JSZip();
-                gridLines.forEach(l => l.visible = false);
-                canvas.renderAll();
                 for (let i = 0; i < screenCount; i++) {
-                    const dataURL = canvas.toDataURL({ format: 'png', quality: 1, multiplier: 2, left: i * SCREEN_WIDTH, top: 0, width: SCREEN_WIDTH, height: SCREEN_HEIGHT });
+                    const dataURL = canvas.toDataURL({ 
+                        format: 'png', quality: 1, multiplier: 2, 
+                        left: i * SCREEN_WIDTH, top: 0, width: SCREEN_WIDTH, height: SCREEN_HEIGHT 
+                    });
                     const imgData = dataURL.split(',')[1];
                     zip.file(`spark_slice_${i + 1}.png`, imgData, {base64: true});
                 }
-                gridLines.forEach(l => l.visible = true); canvas.renderAll();
+                
                 zip.generateAsync({type:"blob"}).then(function(content) {
                     const a = document.createElement('a'); a.href = URL.createObjectURL(content); a.download = "spark_slices.zip"; document.body.appendChild(a); a.click(); document.body.removeChild(a);
                     statusIndicator.innerText = "打包完成"; statusIndicator.classList.remove('status-saving'); statusIndicator.classList.add('status-saved'); setTimeout(() => statusIndicator.classList.remove('visible'), 2000);
                 });
             } catch (e) {
-                console.error(e); alert("导出失败：请确保背景使用的是纯色或通过'+'按钮上传的图片。");
+                console.error(e); alert("导出失败");
                 statusIndicator.innerText = "导出失败"; statusIndicator.classList.remove('status-saving');
+            } finally {
+                canvas.setViewportTransform(originalVpt);
+                canvas.setWidth(originalWidth);
+                canvas.setHeight(originalHeight);
+                gridLines.forEach(l => l.visible = true);
+                canvas.requestRenderAll();
             }
         }
         
