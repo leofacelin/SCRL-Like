@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Spark Canvas - V58 (交互精调终极版)</title>
+    <title>Spark Canvas - V59 (持久化与触控修复)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     
@@ -42,7 +42,7 @@
         /* 底部工具栏 */
         .toolbar { 
             position: fixed; bottom: 25px; left: 50%; transform: translateX(-50%);
-            background: var(--panel-bg); padding: 8px 12px; /* 稍微缩小padding */
+            background: var(--panel-bg); padding: 8px 12px; 
             border-radius: 18px; display: flex; 
             width: 90vw; max-width: 500px; 
             justify-content: space-between; 
@@ -97,30 +97,14 @@
         .preset-dot { width: 100%; height: 100%; border-radius: 50%; cursor: pointer; border: 1px solid rgba(255,255,255,0.1); transition: transform 0.2s; }
         .preset-dot:hover { transform: scale(1.4); border-color: white; z-index: 2; box-shadow: 0 2px 5px rgba(0,0,0,0.5); }
 
-        /* V58: 进一步缩小菜单，更精致 */
-        #context-menu { 
-            display: none; position: absolute; z-index: 2000; 
-            width: 130px; /* 宽度从150缩小到130 */
-            background: rgba(40, 40, 40, 0.98); backdrop-filter: blur(20px); 
-            border: 1px solid #555; border-radius: 12px; 
-            box-shadow: 0 10px 40px rgba(0,0,0,0.8); 
-            padding: 4px; 
-            animation: menuFadeIn 0.15s ease-out; 
-        }
+        #context-menu { display: none; position: absolute; z-index: 2000; width: 130px; background: rgba(40, 40, 40, 0.98); backdrop-filter: blur(20px); border: 1px solid #555; border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.8); padding: 4px; animation: menuFadeIn 0.15s ease-out; }
         @keyframes menuFadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
         
         .menu-header { font-size: 9px; color: #888; padding: 3px 6px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 2px; display: none; }
-        
         .layer-controls { display: flex; justify-content: space-between; background: rgba(255,255,255,0.05); border-radius: 8px; padding: 3px; margin-bottom: 4px; }
         .layer-btn { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border-radius: 6px; cursor: pointer; font-size: 14px; color: #ccc; }
         .layer-btn:hover { background: #555; color: white; }
-        
-        .menu-item { 
-            display: none; align-items: center; 
-            padding: 8px 8px; /* 缩小padding */
-            font-size: 11px; /* 缩小字体 */
-            color: #eee; cursor: pointer; border-radius: 6px; transition: background 0.1s; margin-bottom: 1px; 
-        }
+        .menu-item { display: none; align-items: center; padding: 8px 8px; font-size: 11px; color: #eee; cursor: pointer; border-radius: 6px; transition: background 0.1s; margin-bottom: 1px; }
         .menu-item:hover, .menu-item:active { background: var(--accent-color); color: white; }
         .menu-item.delete { color: var(--danger-color); margin-top: 4px; border-top: 1px solid #555; border-radius: 0 0 8px 8px; }
         .menu-item.delete:hover { background: var(--danger-color); color: white; }
@@ -299,7 +283,9 @@
             preserveObjectStacking: true, 
             fireRightClick: true, stopContextMenu: true,
             selection: false, 
-            allowTouchScrolling: false 
+            allowTouchScrolling: false,
+            // V59 修复：增加点击容错，让移动端更容易选中
+            targetFindTolerance: 15 
         });
 
         let gridLines = [];
@@ -312,10 +298,7 @@
         const DB_NAME = "SparkCanvasDB"; const STORE_NAME = "sessions";
         let db; let saveTimeout;
 
-        // ==========================================
-        // V58: 背景修复 + 防误触 + 界面精调
-        // ==========================================
-        
+        // V57+ 背景状态
         let currentBgFill = '#ffffff'; 
         let bgRect; 
 
@@ -385,6 +368,7 @@
             const evt = opt.e;
             const target = opt.target;
 
+            // 右键处理
             if (opt.button === 3) {
                 if (target && target !== bgRect) {
                     canvas.setActiveObject(target);
@@ -395,6 +379,7 @@
 
             const active = canvas.getActiveObject();
 
+            // 拖拽画布判定
             if (!target || target === bgRect) {
                 if (!active || target !== active) {
                     isDraggingCanvas = true;
@@ -415,18 +400,16 @@
             if (bgPanel.style.display === 'block') bgPanel.style.display = 'none';
             contextMenu.style.display = 'none';
             
-            // --- V58 关键修复：原子级防误触判定 ---
+            // 长按菜单逻辑
             if (target && target !== bgRect && evt.type === 'touchstart') {
                 isDraggingCanvas = false;
                 
-                // V58核心: 如果 target.__corner 存在，说明 Fabric 判定点击的是控制点
-                // 此时直接返回，不执行长按菜单计时
+                // V58: 检查是否点中控制点，如果点中则不触发长按
                 if (target.__corner) {
                     return; 
                 }
 
                 longPressTimer = setTimeout(() => {
-                    // 双重保险：再次检查是否在移动
                     if (!canvas.isDrawingMode && !isDraggingCanvas && !canvas.getActiveObject().isMoving) {
                         openContextMenu(opt);
                     }
@@ -580,7 +563,6 @@
                 y = opt.e.clientY;
             }
 
-            // 移动端菜单位置防溢出逻辑
             if (x + 130 > window.innerWidth) x = window.innerWidth - 140;
             if (y + 300 > window.innerHeight) y = window.innerHeight - 310;
 
@@ -774,6 +756,7 @@
             if(bgRect) canvas.remove(bgRect);
             const json = canvas.toJSON();
             updateWorkspace(); 
+            // V59: 显式保存 currentBgFill
             const saveData = { id: "autosave", canvas: json, screenCount: screenCount, bgFill: currentBgFill, updated: new Date().getTime() };
 
             const tx = db.transaction(STORE_NAME, "readwrite");
@@ -790,13 +773,16 @@
                 if (data) {
                     screenCount = data.screenCount || 1; 
                     canvas.loadFromJSON(data.canvas, () => {
-                        let loadedBg = null;
-                        canvas.getObjects().forEach(obj => {
-                            if (obj.isBackground) {
-                                loadedBg = obj;
-                                currentBgFill = obj.fill; 
-                            }
-                        });
+                        // V59: 优先从 savedData 读取背景色
+                        if (data.bgFill) {
+                            currentBgFill = data.bgFill;
+                        } else {
+                            // 兼容旧存档
+                            canvas.getObjects().forEach(obj => {
+                                if (obj.isBackground) currentBgFill = obj.fill; 
+                            });
+                        }
+                        
                         updateWorkspace(); 
                         
                         canvas.getObjects().forEach(obj => { 
