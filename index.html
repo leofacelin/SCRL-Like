@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Spark Canvas - V50 (无限视界+视觉分层)</title>
+    <title>Spark Canvas - V51 (视觉分层版)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     
@@ -14,36 +14,34 @@
     <style>
         :root { --bg-color: #1e1e1e; --panel-bg: rgba(45, 45, 45, 0.95); --accent-color: #007AFF; --danger-color: #ff453a; --text-color: #fff; --border-color: #444; }
         
-        /* 核心交互设定：禁止浏览器接管手势，全部交给 JS */
         html, body { 
             height: 100%; width: 100%; overflow: hidden; 
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
-            background-color: #121212; /* 全局深色底 */
-            color: var(--text-color); margin: 0; 
-            touch-action: none; /* 关键：禁止原生缩放和滚动 */
+            background-color: var(--bg-color); color: var(--text-color); margin: 0; 
+            touch-action: none; 
         }
         
         #status-indicator { position: fixed; top: 20px; font-size: 12px; color: #666; background: rgba(0,0,0,0.5); padding: 4px 12px; border-radius: 20px; transition: all 0.3s; font-weight: 500; z-index: 10; opacity: 0; pointer-events: none; }
         #status-indicator.visible { opacity: 1; }
         .status-saved { color: #32D74B !important; } .status-saving { color: #FFD700 !important; }
 
-        /* 画布容器：无限视界容器 */
+        /* V51: 画布外区域 (桌面) - 深色 + 点阵纹理 */
         #canvas-wrapper { 
             width: 100vw; height: 100vh; 
             display: flex; justify-content: center; align-items: center;
             overflow: hidden;
-            
-            /* V50 新增：深色点阵纹理背景 */
-            background-color: #1a1a1a;
-            background-image: radial-gradient(#444 1px, transparent 1px);
+            background-color: #121212; 
+            /* 点阵纹理，增加空间感 */
+            background-image: radial-gradient(#333 1px, transparent 1px);
             background-size: 20px 20px;
         }
         
+        /* V51: 画布容器本身设为透明，让上面的 wrapper 背景透出来 */
         .canvas-container { 
-            /* V50 新增：画布的实体感 */
-            box-shadow: 0 0 50px rgba(0,0,0,0.5); /* 柔和阴影 */
-            border: 1px solid rgba(255,255,255,0.1); /* 微弱描边 */
-            background-color: #ffffff; /* 确保画布本身是白的 */
+            background: transparent !important; 
+            /* 取消之前的阴影，因为现在阴影要加在内部的 bgRect 上 */
+            box-shadow: none !important; 
+            border: none !important;
         }
 
         /* 底部工具栏 */
@@ -250,7 +248,6 @@
         let screenCount = 1;
         fabric.textureSize = 2048; 
 
-        // 旋转图标
         const rotateIconImg = new Image();
         rotateIconImg.src = 'rotate.png';
         rotateIconImg.onload = function() { if(canvas) canvas.requestRenderAll(); }
@@ -273,7 +270,8 @@
             snapAngle: 90, snapThreshold: 3,
             cornerStyle: 'circle', cornerColor: '#007AFF', borderColor: '#007AFF',
             transparentCorners: false, borderScaleFactor: 2, cornerSize: 10,
-            centeredScaling: false, lockUniScaling: true
+            centeredScaling: false, lockUniScaling: true,
+            lockMovementX: true, lockMovementY: true 
         });
 
         fabric.Object.prototype.controls.mtr = new fabric.Control({
@@ -283,11 +281,12 @@
         });
 
         const canvas = new fabric.Canvas('c', {
-            width: SCREEN_WIDTH * screenCount, height: SCREEN_HEIGHT,
-            backgroundColor: '#ffffff', preserveObjectStacking: true, 
+            width: window.innerWidth, height: window.innerHeight, // 画布充满全屏
+            backgroundColor: null, // 透明背景，让下面的wrapper透出来
+            preserveObjectStacking: true, 
             fireRightClick: true, stopContextMenu: true,
             selection: false, 
-            allowTouchScrolling: false // 关键：JS接管滚动
+            allowTouchScrolling: false // 禁止原生滚动，全部 JS 接管
         });
 
         let gridLines = [];
@@ -301,7 +300,56 @@
         let db; let saveTimeout;
 
         // ==========================================
-        // V50: 自由视界 + 视觉分层
+        // V51 核心: 实体化“画纸” (Background Rect)
+        // ==========================================
+        
+        let bgRect; // 这是一个真正的 Fabric 对象，用来充当“画纸”
+
+        function updateCanvasBackground() {
+            // 移除旧的背景纸
+            if (bgRect) canvas.remove(bgRect);
+            
+            // 创建新的白纸
+            bgRect = new fabric.Rect({
+                left: 0, 
+                top: 0,
+                width: screenCount * SCREEN_WIDTH,
+                height: SCREEN_HEIGHT,
+                fill: '#ffffff', // 默认白色
+                selectable: false, // 不可选中
+                evented: false, // 不响应事件（点它等于点空白处，触发拖拽画布）
+                shadow: new fabric.Shadow({ color: 'rgba(0,0,0,0.5)', blur: 50, offsetX: 0, offsetY: 10 }) // 阴影增加立体感
+            });
+            
+            canvas.add(bgRect);
+            canvas.sendToBack(bgRect);
+            
+            // 重新画网格线
+            drawGrid();
+        }
+
+        // 修改更换背景颜色的逻辑：改的是 bgRect 的颜色
+        function changeBackgroundColor(color) {
+            if(bgRect) {
+                bgRect.set('fill', color);
+                canvas.requestRenderAll();
+                triggerAutoSave();
+            }
+        }
+
+        // 修改图片背景逻辑：改的是 bgRect 的 pattern
+        function applyPattern(imgSrc) {
+            fabric.util.loadImage(imgSrc, function(img) {
+                if(!img || !bgRect) return;
+                const pattern = new fabric.Pattern({ source: img, repeat: 'repeat' });
+                bgRect.set('fill', pattern);
+                canvas.requestRenderAll();
+                triggerAutoSave();
+            });
+        }
+
+        // ==========================================
+        // V50 复刻的自由视界逻辑 (Infinite Canvas)
         // ==========================================
         
         let isDraggingCanvas = false;
@@ -309,30 +357,37 @@
         let lastPosY = 0;
 
         function initViewport() {
-            const wrapper = document.getElementById('canvas-wrapper');
-            const wrapperWidth = wrapper.clientWidth;
-            const wrapperHeight = wrapper.clientHeight;
+            // 调整 Canvas 尺寸为全屏
+            canvas.setWidth(window.innerWidth);
+            canvas.setHeight(window.innerHeight);
             
-            // 初始缩放：稍微留边距
+            // 计算初始缩放和位置，让白纸居中
+            const wrapperWidth = window.innerWidth;
+            const wrapperHeight = window.innerHeight;
+            
             let zoom = (wrapperWidth - 60) / SCREEN_WIDTH;
             if(zoom > 1) zoom = 1; 
             if(zoom < 0.1) zoom = 0.1;
 
             canvas.setZoom(zoom);
             
-            // 居中
             const vpt = canvas.viewportTransform;
-            vpt[4] = (wrapperWidth - canvas.width * zoom) / 2;
-            vpt[5] = (wrapperHeight - canvas.height * zoom) / 2;
-            if(vpt[5] < 30) vpt[5] = 30; // 顶部留空
+            vpt[4] = (wrapperWidth - (screenCount * SCREEN_WIDTH) * zoom) / 2;
+            vpt[5] = (wrapperHeight - SCREEN_HEIGHT * zoom) / 2;
             
             canvas.requestRenderAll();
         }
         
         window.addEventListener('resize', () => {
-            // 可选：resize 时是否重置？暂不重置，保留用户视角
+            canvas.setWidth(window.innerWidth);
+            canvas.setHeight(window.innerHeight);
         });
-        setTimeout(initViewport, 100);
+        
+        // 初始化
+        setTimeout(() => {
+            updateCanvasBackground(); // 先造纸
+            initViewport(); // 再居中
+        }, 100);
 
         // 1. Mouse/Touch Down
         canvas.on('mouse:down', function(opt) {
@@ -340,16 +395,14 @@
             const target = canvas.findTarget(evt) || opt.target;
             const active = canvas.getActiveObject();
 
-            // 逻辑 A: 点中 已选中对象 -> 移动对象
+            // 如果点击的是 bgRect，视为点击空白
+            const isTargetPaper = target === bgRect;
+
             if (active && target === active) {
                 isDraggingCanvas = false;
-            }
-            // 逻辑 B: 点中 未选中对象 -> 选中它 (Fabric 自动处理)
-            else if (target) {
+            } else if (target && !isTargetPaper) {
                 isDraggingCanvas = false;
-            }
-            // 逻辑 C: 点中 空白处 -> 拖拽画布
-            else {
+            } else {
                 isDraggingCanvas = true;
                 canvas.selection = false; 
                 
@@ -365,8 +418,7 @@
                 if (opt.button === 3) { isDraggingCanvas = false; } else { contextMenu.style.display = 'none'; }
             }
             
-            // 长按菜单
-            if (target && evt.type === 'touchstart') {
+            if (target && !isTargetPaper && evt.type === 'touchstart') {
                 isDraggingCanvas = false; 
                 longPressTimer = setTimeout(() => {
                     if (!isObjectMoving) { 
@@ -416,20 +468,21 @@
             canvas.setViewportTransform(canvas.viewportTransform); 
         });
 
-        // 4. Pinch Zoom (双指缩放画布/物体)
+        // 4. Pinch Zoom (双指缩放)
         let initialPinchDistance = 0;
         let initialPinchZoom = 1;
         let initialObjectScale = 1;
         let initialObjectAngle = 0;
-        let initialAngle = 0; // 声明 initialAngle
+        let initialAngle = 0;
         let pinchMode = null; 
 
         canvas.upperCanvasEl.addEventListener('touchstart', function(e) {
             if (e.touches.length === 2) {
                 isDraggingCanvas = false; 
                 
-                const target = canvas.findTarget(e) || canvas.getActiveObject();
-                
+                let target = canvas.findTarget(e) || canvas.getActiveObject();
+                if (target === bgRect) target = null; // 背景纸不参与对象缩放
+
                 const dx = e.touches[0].clientX - e.touches[1].clientX;
                 const dy = e.touches[0].clientY - e.touches[1].clientY;
                 initialPinchDistance = Math.sqrt(dx * dx + dy * dy);
@@ -511,7 +564,7 @@
 
         function openContextMenu(opt) {
             const target = opt.target || canvas.getActiveObject();
-            if(!target) return;
+            if(!target || target === bgRect) return; // 忽略背景纸
             
             canvas.setActiveObject(target);
             const type = target.type;
@@ -554,11 +607,6 @@
             bgPanel.style.display = isVisible ? 'none' : 'block';
         }
 
-        function changeBackgroundColor(color) {
-            canvas.setBackgroundImage(null, canvas.renderAll.bind(canvas));
-            canvas.setBackgroundColor(color, () => { canvas.renderAll(); triggerAutoSave(); });
-        }
-
         function handleBgFile(files) {
             if (!files || !files[0]) return;
             const reader = new FileReader();
@@ -567,23 +615,15 @@
             document.getElementById('bg-file-input').value = '';
         }
 
-        function applyPattern(imgSrc) {
-            fabric.util.loadImage(imgSrc, function(img) {
-                if(!img) return;
-                const pattern = new fabric.Pattern({ source: img, repeat: 'repeat' });
-                canvas.setBackgroundColor(pattern, () => { canvas.renderAll(); triggerAutoSave(); });
-            });
-        }
-
         function showModal() { confirmModal.style.display = 'block'; }
         function closeModal() { confirmModal.style.display = 'none'; }
         
         function executeClear() {
             canvas.clear(); 
-            canvas.setBackgroundColor('#ffffff', canvas.renderAll.bind(canvas));
-            canvas.setViewportTransform([1, 0, 0, 1, 0, 0]); 
-            screenCount = 1; canvas.setWidth(SCREEN_WIDTH); 
-            drawGrid();
+            // 重置为 1 屏
+            screenCount = 1; 
+            // 重新造纸和布局
+            updateCanvasBackground();
             initViewport(); 
             
             if(db) { const tx = db.transaction(STORE_NAME, "readwrite"); tx.objectStore(STORE_NAME).delete("last_session"); }
@@ -611,7 +651,6 @@
         }
 
         function addText() {
-            // 获取当前视图中心
             const center = canvas.getVpCenter();
             const selectedFont = fontSelector.value;
             const text = new fabric.IText('双击编辑', {
@@ -709,6 +748,9 @@
                 case 'weight-up': if (obj.type === 'i-text' || obj.type === 'text') { let current = parseInt(obj.fontWeight) || 600; if(current === 'normal') current = 400; if(current === 'bold') current = 700; let next = FONT_WEIGHTS.find(w => w > current); if (!next) next = FONT_WEIGHTS[FONT_WEIGHTS.length - 1]; obj.set('fontWeight', next); } break;
                 case 'weight-down': if (obj.type === 'i-text' || obj.type === 'text') { let current = parseInt(obj.fontWeight) || 600; if(current === 'normal') current = 400; if(current === 'bold') current = 700; let prev = [...FONT_WEIGHTS].reverse().find(w => w < current); if (!prev) prev = FONT_WEIGHTS[0]; obj.set('fontWeight', prev); } break;
             }
+            // 保持背景纸在底层
+            if(bgRect) canvas.sendToBack(bgRect);
+            
             bringGridToFront(); canvas.renderAll(); triggerAutoSave();
             contextMenu.style.display = 'none';
         }
@@ -723,6 +765,8 @@
         function saveState() {
             if (!db) return;
             statusIndicator.innerText = "保存中..."; statusIndicator.classList.add('visible', 'status-saving');
+            // 注意：bgRect 不要存进去，或者加载时忽略它
+            // 这里我们简单起见存进去，加载时会重新 create
             const json = canvas.toJSON();
             const tx = db.transaction(STORE_NAME, "readwrite");
             tx.objectStore(STORE_NAME).put({ id: "autosave", canvas: json, screenCount: screenCount, updated: new Date().getTime() }, "last_session");
@@ -736,9 +780,21 @@
             tx.objectStore(STORE_NAME).get("last_session").onsuccess = (e) => {
                 const data = e.target.result;
                 if (data) {
-                    screenCount = data.screenCount || 1; canvas.setWidth(SCREEN_WIDTH * screenCount);
+                    screenCount = data.screenCount || 1; 
                     canvas.loadFromJSON(data.canvas, () => {
+                        // 清理可能存在的旧 bgRect (如果存档里有的话)
+                        canvas.getObjects().forEach(obj => {
+                            if (obj.width === screenCount * SCREEN_WIDTH && obj.height === SCREEN_HEIGHT && obj.fill === '#ffffff') {
+                                canvas.remove(obj);
+                            }
+                        });
+                        
+                        // 重建全新的 bgRect
+                        updateCanvasBackground();
+                        
                         canvas.getObjects().forEach(obj => { 
+                            if(obj === bgRect) return; // 跳过背景
+                            
                             if(obj.type === 'image') {
                                 obj.setControlsVisibility({ mt: false, mb: false, ml: false, mr: false });
                                 obj.set('noScaleCache', false); 
@@ -748,12 +804,16 @@
                                 obj.set('objectCaching', false);
                             }
                         });
-                        drawGrid(); canvas.renderAll(); 
+                        drawGrid(); 
                         initViewport(); 
                         statusIndicator.innerText = "已恢复进度"; statusIndicator.classList.add('visible');
                         setTimeout(() => statusIndicator.classList.remove('visible'), 2000);
                     });
-                } else { drawGrid(); initViewport(); }
+                } else { 
+                    updateCanvasBackground();
+                    drawGrid(); 
+                    initViewport(); 
+                }
             };
         }
         function triggerAutoSave() {
@@ -775,8 +835,8 @@
         }
         function bringGridToFront() { gridLines.forEach(l => l.bringToFront()); }
         
-        function addScreen() { screenCount++; canvas.setWidth(SCREEN_WIDTH * screenCount); drawGrid(); canvas.renderAll(); triggerAutoSave(); }
-        function removeScreen() { if (screenCount > 1) { screenCount--; canvas.setWidth(SCREEN_WIDTH * screenCount); drawGrid(); canvas.renderAll(); triggerAutoSave(); } }
+        function addScreen() { screenCount++; updateCanvasBackground(); canvas.renderAll(); triggerAutoSave(); }
+        function removeScreen() { if (screenCount > 1) { screenCount--; updateCanvasBackground(); canvas.renderAll(); triggerAutoSave(); } }
         
         function handleFiles(files) {
             if (!files) return;
@@ -807,10 +867,17 @@
             const originalWidth = canvas.width;
             const originalHeight = canvas.height;
 
+            // 导出时：重置视口到 bgRect 大小
             canvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
-            canvas.setWidth(SCREEN_WIDTH * screenCount);
+            canvas.setWidth(screenCount * SCREEN_WIDTH);
             canvas.setHeight(SCREEN_HEIGHT);
+            
+            // 隐藏网格线
             gridLines.forEach(l => l.visible = false);
+            
+            // 确保背景纸在最下面
+            if(bgRect) canvas.sendToBack(bgRect);
+            
             canvas.renderAll();
 
             try {
@@ -832,6 +899,7 @@
                 console.error(e); alert("导出失败");
                 statusIndicator.innerText = "导出失败"; statusIndicator.classList.remove('status-saving');
             } finally {
+                // 恢复视口
                 canvas.setViewportTransform(originalVpt);
                 canvas.setWidth(originalWidth);
                 canvas.setHeight(originalHeight);
