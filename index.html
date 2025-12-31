@@ -2,8 +2,8 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Spark Canvas - V62 (版面精修版)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Spark Canvas - V63 (视口适配修复版)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     
@@ -14,8 +14,12 @@
     <style>
         :root { --bg-color: #1e1e1e; --panel-bg: rgba(45, 45, 45, 0.95); --accent-color: #007AFF; --danger-color: #ff453a; --text-color: #fff; --border-color: #444; }
         
+        /* V63: 核心修复 - 强制锁定 Body，防止浏览器自身的滚动/回弹干扰 */
         html, body { 
-            height: 100%; width: 100%; overflow: hidden; 
+            height: 100%; width: 100%; 
+            position: fixed; /* 钉死在屏幕上 */
+            top: 0; left: 0; right: 0; bottom: 0;
+            overflow: hidden; 
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
             background-color: #121212; 
             color: var(--text-color); margin: 0; 
@@ -23,13 +27,15 @@
             -webkit-user-select: none; user-select: none;
         }
         
-        /* V62: 字号改为 11px */
         #status-indicator { position: fixed; top: 20px; font-size: 11px; color: #666; background: rgba(0,0,0,0.5); padding: 4px 12px; border-radius: 20px; transition: all 0.3s; font-weight: 500; z-index: 10; opacity: 0; pointer-events: none; }
         #status-indicator.visible { opacity: 1; }
         .status-saved { color: #32D74B !important; } .status-saving { color: #FFD700 !important; }
 
+        /* V63: 核心修复 - 使用 dvh 单位，适应移动端动态地址栏 */
         #canvas-wrapper { 
-            width: 100vw; height: 100vh; 
+            width: 100vw; 
+            height: 100vh; /* 兼容旧浏览器 */
+            height: 100dvh; /* 核心：动态视口高度 */
             overflow: hidden;
             background-color: #121212; 
             background-image: radial-gradient(#333 1px, transparent 1px);
@@ -49,6 +55,9 @@
             box-shadow: 0 10px 40px rgba(0,0,0,0.5); backdrop-filter: blur(20px); 
             z-index: 100; border: 1px solid rgba(255,255,255,0.15); 
             box-sizing: border-box;
+            /* 防止刘海屏遮挡底部 */
+            padding-bottom: env(safe-area-inset-bottom, 8px); 
+            margin-bottom: env(safe-area-inset-bottom, 0); 
         }
         .tool-group { display: flex; gap: 8px; align-items: center; }
         
@@ -76,7 +85,7 @@
             position: absolute; top:0; left:0; -webkit-appearance: none;
         }
 
-        #bg-panel { display: none; position: absolute; bottom: 90px; left: 50%; transform: translateX(-50%); background: rgba(30, 30, 30, 0.95); backdrop-filter: blur(20px); border: 1px solid #444; border-radius: 16px; padding: 15px; box-shadow: 0 10px 40px rgba(0,0,0,0.8); z-index: 90; animation: panelUp 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275); width: 220px; }
+        #bg-panel { display: none; position: absolute; bottom: 90px; left: 50%; transform: translateX(-50%); background: rgba(30, 30, 30, 0.95); backdrop-filter: blur(20px); border: 1px solid #444; border-radius: 16px; padding: 15px; box-shadow: 0 10px 40px rgba(0,0,0,0.8); z-index: 90; animation: panelUp 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275); width: 220px; padding-bottom: env(safe-area-inset-bottom, 15px); }
         @keyframes panelUp { from { opacity: 0; transform: translate(-50%, 20px); } to { opacity: 1; transform: translate(-50%, 0); } }
         .panel-title { font-size: 12px; color: #888; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 1px; text-align: center; }
         .bg-options { display: flex; justify-content: space-between; gap: 10px; align-items: center; }
@@ -277,7 +286,7 @@
             fireRightClick: true, stopContextMenu: true,
             selection: false, 
             allowTouchScrolling: false,
-            targetFindTolerance: 20 // V60+ 提高移动端点击命中率
+            targetFindTolerance: 20 
         });
 
         let gridLines = [];
@@ -324,7 +333,6 @@
             }
         }
 
-        // V62: 智能首屏定位 logic
         function initViewport() {
             const winW = window.innerWidth;
             const winH = window.innerHeight;
@@ -333,18 +341,14 @@
             
             let zoom;
 
-            // 移动端逻辑 (假设宽度 < 600)
+            // 移动端逻辑 (宽度 < 600)
             if (winW < 600) {
-                // 目标：画布高度 = 屏幕高度 80%
                 const targetHeight = winH * 0.8;
                 zoom = targetHeight / SCREEN_HEIGHT;
-                
-                // 宽度防溢出：如果按高度缩放后太宽，则限制宽度
                 if (SCREEN_WIDTH * zoom > winW - 20) {
                     zoom = (winW - 20) / SCREEN_WIDTH;
                 }
             } else {
-                // 桌面端逻辑 (保持原有舒适边距)
                 zoom = (winW - 60) / SCREEN_WIDTH;
                 if(zoom > 1) zoom = 1; 
             }
@@ -354,15 +358,11 @@
 
             const vpt = canvas.viewportTransform;
             
-            // 核心修复：无论几页，都居中显示【第一屏】(x=0 ~ 540)
-            // 公式：屏幕中心 = (第一屏宽度/2 * zoom) + 偏移量X
-            // 偏移量X = 屏幕中心 - (第一屏半宽 * zoom)
+            // 核心：居中显示第一屏
             vpt[4] = (winW / 2) - ((SCREEN_WIDTH / 2) * zoom);
-            
-            // 垂直居中
             vpt[5] = (winH - SCREEN_HEIGHT * zoom) / 2;
             
-            updateHitRegions(); // V60+ 必须刷新热区
+            updateHitRegions(); 
             canvas.requestRenderAll();
         }
         
@@ -491,7 +491,6 @@
             if (e.touches.length === 2) {
                 isDraggingCanvas = false; 
                 
-                // V60: 使用 Fabric API 获取指针位置下的对象
                 const pointer0 = canvas.getPointer(e.touches[0]); 
                 let target = canvas.findTarget(e); 
                 
@@ -663,15 +662,10 @@
 
         function addText() {
             const center = canvas.getVpCenter();
-            // 修正坐标转换
-            const zoom = canvas.getZoom();
-            const vpt = canvas.viewportTransform;
-            const cx = (canvas.width / 2 - vpt[4]) / zoom;
-            const cy = (canvas.height / 2 - vpt[5]) / zoom;
-
             const selectedFont = fontSelector.value;
             const text = new fabric.IText('双击编辑', {
-                left: cx, top: cy,
+                left: center.x,
+                top: center.y, 
                 fontFamily: selectedFont, 
                 fontWeight: 600, 
                 fill: '#000000', 
