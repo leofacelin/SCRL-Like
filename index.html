@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Spark Canvas - V48 (自由视界版)</title>
+    <title>Spark Canvas - V53 (交互修复版)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     
@@ -15,27 +15,28 @@
         :root { --bg-color: #1e1e1e; --panel-bg: rgba(45, 45, 45, 0.95); --accent-color: #007AFF; --danger-color: #ff453a; --text-color: #fff; --border-color: #444; }
         
         html, body { 
-            height: 100%; width: 100%; overflow: hidden; /* 彻底禁止原生滚动 */
+            height: 100%; width: 100%; overflow: hidden; 
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
-            background-color: var(--bg-color); color: var(--text-color); margin: 0; 
-            touch-action: none; /* 全局禁止浏览器处理触摸，全部交给 JS */
+            background-color: #121212; 
+            color: var(--text-color); margin: 0; 
+            touch-action: none; /* 禁止原生手势，JS 全权接管 */
         }
         
         #status-indicator { position: fixed; top: 20px; font-size: 12px; color: #666; background: rgba(0,0,0,0.5); padding: 4px 12px; border-radius: 20px; transition: all 0.3s; font-weight: 500; z-index: 10; opacity: 0; pointer-events: none; }
         #status-indicator.visible { opacity: 1; }
         .status-saved { color: #32D74B !important; } .status-saving { color: #FFD700 !important; }
 
-        /* 画布容器充满屏幕 */
+        /* 画布容器 */
         #canvas-wrapper { 
             width: 100vw; height: 100vh; 
-            display: flex; justify-content: center; align-items: center;
             overflow: hidden;
+            background-color: #121212; 
+            background-image: radial-gradient(#333 1px, transparent 1px);
+            background-size: 20px 20px;
         }
         
-        .canvas-container { 
-            box-shadow: 0 0 80px rgba(0,0,0,0.5); 
-            border: 1px solid #333; 
-        }
+        /* 这里的 canvas-container 只是 fabric 的包裹层，样式主要靠内部对象 */
+        .canvas-container { margin: 0 auto; }
 
         /* 底部工具栏 */
         .toolbar { 
@@ -128,14 +129,16 @@
         .modal-btn.cancel:hover { background: #555; }
         .modal-btn.confirm { background: var(--danger-color); color: white; }
         .modal-btn.confirm:hover { background: #ff5b50; }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
         #file-input, #bg-file-input { display: none; }
     </style>
 </head>
 <body>
     <div id="status-indicator">准备就绪</div>
-    <div id="canvas-wrapper"><canvas id="c"></canvas></div>
+    
+    <div id="canvas-wrapper">
+        <canvas id="c"></canvas>
+    </div>
 
     <div id="bg-panel">
         <div class="panel-title">背景设置</div>
@@ -172,34 +175,33 @@
     <div id="context-menu">
         <div class="menu-header show-header">图层 Layer</div>
         <div class="layer-controls">
-            <div class="layer-btn" onclick="menuAction('top')" title="置顶">⤒</div>
-            <div class="layer-btn" onclick="menuAction('up')" title="上移">↑</div>
-            <div class="layer-btn" onclick="menuAction('down')" title="下移">↓</div>
-            <div class="layer-btn" onclick="menuAction('bottom')" title="置底">⤓</div>
+            <div class="layer-btn" onclick="menuAction('top')">⤒</div>
+            <div class="layer-btn" onclick="menuAction('up')">↑</div>
+            <div class="layer-btn" onclick="menuAction('down')">↓</div>
+            <div class="layer-btn" onclick="menuAction('bottom')">⤓</div>
         </div>
         
-        <div class="menu-header image-menu-item">图片效果 Effect</div>
+        <div class="menu-header image-menu-item">效果 Effect</div>
         <div class="menu-item image-menu-item" onclick="menuAction('flipX')"><span class="menu-icon-span">⇄</span> 水平翻转</div>
         <div class="menu-item image-menu-item" onclick="menuAction('filter-bw')"><span class="menu-icon-span">◐</span> 黑白滤镜</div>
         <div class="menu-item image-menu-item" onclick="menuAction('shadow')"><span class="menu-icon-span">❑</span> 投影</div>
 
-        <div class="menu-header text-menu-item">文字设置 Text</div>
+        <div class="menu-header text-menu-item">文字设置</div>
         <div class="text-colors-container text-menu-item">
-            <div class="text-color-dot" style="background: #000000" onclick="changeTextColor('#000000')" title="黑"></div>
-            <div class="text-color-dot" style="background: #ffffff" onclick="changeTextColor('#ffffff')" title="白"></div>
-            <div class="text-color-dot" style="background: #FFCC00" onclick="changeTextColor('#FFCC00')" title="黄"></div>
-            <div class="text-color-dot" style="background: #34C759" onclick="changeTextColor('#34C759')" title="绿"></div>
-            <div class="text-color-dot" style="background: #007AFF" onclick="changeTextColor('#007AFF')" title="蓝"></div>
-            <div class="text-color-dot" style="background: #FF3B30" onclick="changeTextColor('#FF3B30')" title="红"></div>
+            <div class="text-color-dot" style="background: #000000" onclick="changeTextColor('#000000')"></div>
+            <div class="text-color-dot" style="background: #ffffff" onclick="changeTextColor('#ffffff')"></div>
+            <div class="text-color-dot" style="background: #FFCC00" onclick="changeTextColor('#FFCC00')"></div>
+            <div class="text-color-dot" style="background: #34C759" onclick="changeTextColor('#34C759')"></div>
+            <div class="text-color-dot" style="background: #007AFF" onclick="changeTextColor('#007AFF')"></div>
+            <div class="text-color-dot" style="background: #FF3B30" onclick="changeTextColor('#FF3B30')"></div>
         </div>
         <div class="align-toolbar text-menu-item">
-            <div class="align-btn" onclick="menuAction('align-left')" title="左对齐">|←</div>
-            <div class="align-btn" onclick="menuAction('align-center')" title="居中">→|←</div>
-            <div class="align-btn" onclick="menuAction('align-right')" title="右对齐">→|</div>
+            <div class="align-btn" onclick="menuAction('align-left')">|←</div>
+            <div class="align-btn" onclick="menuAction('align-center')">→|←</div>
+            <div class="align-btn" onclick="menuAction('align-right')">→|</div>
         </div>
         <div class="menu-item text-menu-item" onclick="menuAction('weight-up')"><span class="menu-icon-span">B↑</span> 增加字重</div>
         <div class="menu-item text-menu-item" onclick="menuAction('weight-down')"><span class="menu-icon-span">B↓</span> 缩小字重</div>
-        
         <div class="menu-item text-menu-item" onclick="menuAction('spacing-up')"><span class="menu-icon-span">←→</span> 字间距 +</div>
         <div class="menu-item text-menu-item" onclick="menuAction('spacing-down')"><span class="menu-icon-span">→←</span> 字间距 -</div>
         <div class="menu-item text-menu-item" onclick="menuAction('line-height-up')"><span class="menu-icon-span">↕</span> 行间距 +</div>
@@ -243,7 +245,6 @@
         let screenCount = 1;
         fabric.textureSize = 2048; 
 
-        // 旋转图标
         const rotateIconImg = new Image();
         rotateIconImg.src = 'rotate.png';
         rotateIconImg.onload = function() { if(canvas) canvas.requestRenderAll(); }
@@ -266,7 +267,9 @@
             snapAngle: 90, snapThreshold: 3,
             cornerStyle: 'circle', cornerColor: '#007AFF', borderColor: '#007AFF',
             transparentCorners: false, borderScaleFactor: 2, cornerSize: 10,
-            centeredScaling: false, lockUniScaling: true
+            centeredScaling: false, lockUniScaling: true,
+            // V53 修正：默认允许移动，因为我们有明确的点击判定
+            lockMovementX: false, lockMovementY: false
         });
 
         fabric.Object.prototype.controls.mtr = new fabric.Control({
@@ -276,11 +279,12 @@
         });
 
         const canvas = new fabric.Canvas('c', {
-            width: SCREEN_WIDTH * screenCount, height: SCREEN_HEIGHT,
-            backgroundColor: '#ffffff', preserveObjectStacking: true, 
+            width: window.innerWidth, height: window.innerHeight,
+            backgroundColor: null, 
+            preserveObjectStacking: true, 
             fireRightClick: true, stopContextMenu: true,
-            selection: false, 
-            allowTouchScrolling: false // 禁用原生滚动，我们自己实现 Pan
+            selection: false, // 无限画布模式通常禁用框选，避免误操作
+            allowTouchScrolling: false // 禁止原生滚动
         });
 
         let gridLines = [];
@@ -294,97 +298,123 @@
         let db; let saveTimeout;
 
         // ==========================================
-        // V48 复刻的自由视界逻辑 (Infinite Canvas)
+        // V53 核心: 实体画纸 + 无限画布 + 修复点击判定
         // ==========================================
         
-        let isDraggingCanvas = false;
-        let lastPosX = 0;
-        let lastPosY = 0;
+        let bgRect; // 白纸对象
 
-        function initViewport() {
-            const wrapper = document.getElementById('canvas-wrapper');
-            const wrapperWidth = wrapper.clientWidth;
-            const wrapperHeight = wrapper.clientHeight;
+        function updateWorkspace() {
+            // 1. 重绘画纸
+            if (bgRect) canvas.remove(bgRect);
             
-            // 初始缩放
-            let zoom = (wrapperWidth - 60) / SCREEN_WIDTH;
+            bgRect = new fabric.Rect({
+                left: 0, top: 0,
+                width: screenCount * SCREEN_WIDTH,
+                height: SCREEN_HEIGHT,
+                fill: '#ffffff',
+                // 核心修复：evented: false 让点击直接穿透给 canvas 容器，
+                // 这样 findTarget(e) 就会返回 null (或者不返回 bgRect)
+                // 从而触发我们的 Panning 逻辑
+                selectable: false, evented: false, 
+                shadow: new fabric.Shadow({ color: 'rgba(0,0,0,0.5)', blur: 60, offsetX: 0, offsetY: 20 })
+            });
+            canvas.add(bgRect);
+            canvas.sendToBack(bgRect);
+
+            // 2. 重绘网格
+            gridLines.forEach(l => canvas.remove(l)); 
+            gridLines = [];
+            for (let i = 1; i < screenCount; i++) {
+                const line = new fabric.Line([i * SCREEN_WIDTH, 0, i * SCREEN_WIDTH, SCREEN_HEIGHT], {
+                    stroke: '#007AFF', strokeWidth: 1, strokeDashArray: [5, 5], opacity: 0.3, selectable: false, evented: false, excludeFromExport: true
+                });
+                canvas.add(line); gridLines.push(line);
+            }
+        }
+
+        // 视口初始化
+        function initViewport() {
+            canvas.setWidth(window.innerWidth);
+            canvas.setHeight(window.innerHeight);
+            
+            let zoom = (window.innerWidth - 60) / SCREEN_WIDTH;
             if(zoom > 1) zoom = 1; 
             if(zoom < 0.1) zoom = 0.1;
-
+            
             canvas.setZoom(zoom);
-            
-            // 居中
             const vpt = canvas.viewportTransform;
-            vpt[4] = (wrapperWidth - canvas.width * zoom) / 2;
-            vpt[5] = (wrapperHeight - canvas.height * zoom) / 2;
-            
+            vpt[4] = (window.innerWidth - (screenCount * SCREEN_WIDTH) * zoom) / 2;
+            vpt[5] = (window.innerHeight - SCREEN_HEIGHT * zoom) / 2;
+            if(vpt[5] < 50) vpt[5] = 50; 
             canvas.requestRenderAll();
         }
-        
+
         window.addEventListener('resize', () => {
             canvas.setWidth(window.innerWidth);
             canvas.setHeight(window.innerHeight);
         });
-        
+
+        // 初始化
         setTimeout(() => {
-            canvas.setWidth(window.innerWidth);
-            canvas.setHeight(window.innerHeight);
+            updateWorkspace();
             initViewport();
         }, 100);
 
-        // 1. Mouse/Touch Down
+        // --- 交互逻辑 (Infinite Canvas) V53 修正版 ---
+        
+        let isDraggingCanvas = false;
+        let lastX, lastY;
+
+        // Mouse/Touch Down
         canvas.on('mouse:down', function(opt) {
             const evt = opt.e;
             
-            // 判断是否点击了活动的物体
-            const target = canvas.findTarget(evt) || opt.target;
-            const active = canvas.getActiveObject();
-
-            // 逻辑 A: 点中 已选中对象 -> 移动对象
-            if (active && target === active) {
-                isDraggingCanvas = false;
-            }
-            // 逻辑 B: 点中 未选中对象 -> 选中它 (Fabric 自动处理)
-            else if (target) {
-                isDraggingCanvas = false;
-            }
-            // 逻辑 C: 点中 空白处 -> 拖拽画布
-            else {
+            // 关键：如果点到了 bgRect (因为 evented:false，通常不会点到，但以防万一)
+            // 或者没有点到任何 target -> 启用画布拖拽
+            const target = opt.target;
+            
+            if (!target || target === bgRect) {
+                // 如果当前正好选中了一个物体，且点击到了外部 -> 取消选中，并准备拖拽画布
+                // 如果当前没有选中物体 -> 准备拖拽画布
                 isDraggingCanvas = true;
-                canvas.selection = false; 
+                canvas.discardActiveObject(); // 取消所有选中
+                canvas.requestRenderAll();
                 
-                if (evt.type === 'touchstart') {
-                    lastPosX = evt.touches[0].clientX;
-                    lastPosY = evt.touches[0].clientY;
+                if(evt.type === 'touchstart') {
+                    lastX = evt.touches[0].clientX;
+                    lastY = evt.touches[0].clientY;
                 } else {
-                    lastPosX = evt.clientX;
-                    lastPosY = evt.clientY;
+                    lastX = evt.clientX;
+                    lastY = evt.clientY;
                 }
-                
-                if (bgPanel.style.display === 'block') bgPanel.style.display = 'none';
-                if (opt.button === 3) { isDraggingCanvas = false; } else { contextMenu.style.display = 'none'; }
+            } else {
+                // 点到了物体 -> Fabric 自动处理选中和拖拽
+                isDraggingCanvas = false;
+                // 确保物体是激活的
+                canvas.setActiveObject(target);
             }
             
-            // 移动端长按呼出菜单
-            if (target && evt.type === 'touchstart') {
-                isDraggingCanvas = false; // 如果按住对象，不拖画布
+            if (bgPanel.style.display === 'block') bgPanel.style.display = 'none';
+            if (opt.button === 3) isDraggingCanvas = false; else contextMenu.style.display = 'none';
+            
+            // 长按菜单
+            if (target && target !== bgRect && evt.type === 'touchstart') {
+                isDraggingCanvas = false;
                 longPressTimer = setTimeout(() => {
-                    if (!isObjectMoving) { 
-                        canvas.setActiveObject(target);
+                    // 如果没有移动，才触发菜单
+                    if (!canvas.isDrawingMode && !isDraggingCanvas && !canvas.getActiveObject().isMoving) {
                         openContextMenu(opt);
                     }
                 }, 500);
             }
         });
 
-        // 2. Mouse/Touch Move
-        let isObjectMoving = false;
+        // Mouse/Touch Move
         canvas.on('mouse:move', function(opt) {
             if (isDraggingCanvas) {
                 const evt = opt.e;
                 let clientX, clientY;
-                
-                if (evt.type === 'touchmove') {
+                if(evt.type === 'touchmove') {
                     clientX = evt.touches[0].clientX;
                     clientY = evt.touches[0].clientY;
                 } else {
@@ -392,111 +422,26 @@
                     clientY = evt.clientY;
                 }
                 
-                const deltaX = clientX - lastPosX;
-                const deltaY = clientY - lastPosY;
+                const vpt = canvas.viewportTransform;
+                vpt[4] += clientX - lastX;
+                vpt[5] += clientY - lastY;
+                canvas.requestRenderAll();
                 
-                canvas.relativePan({ x: deltaX, y: deltaY });
-                
-                lastPosX = clientX;
-                lastPosY = clientY;
+                lastX = clientX;
+                lastY = clientY;
             } else {
-                // 如果在移动对象，标记一下
-                const active = canvas.getActiveObject();
-                if (active && (active.isMoving || active.isScaling || active.isRotating)) {
-                    isObjectMoving = true;
-                    clearTimeout(longPressTimer);
-                }
+                clearTimeout(longPressTimer);
             }
         });
 
-        // 3. Mouse/Touch Up
+        // Mouse Up
         canvas.on('mouse:up', function(opt) {
             isDraggingCanvas = false;
-            isObjectMoving = false;
             clearTimeout(longPressTimer);
-            canvas.setViewportTransform(canvas.viewportTransform); 
+            // 可以在这里加边界回弹逻辑
         });
 
-        // 4. Pinch Zoom
-        let initialPinchDistance = 0;
-        let initialPinchZoom = 1;
-        let initialObjectScale = 1;
-        let initialObjectAngle = 0;
-        let initialAngle = 0;
-        let pinchMode = null; 
-
-        canvas.upperCanvasEl.addEventListener('touchstart', function(e) {
-            if (e.touches.length === 2) {
-                isDraggingCanvas = false; 
-                
-                const target = canvas.findTarget(e) || canvas.getActiveObject();
-                
-                const dx = e.touches[0].clientX - e.touches[1].clientX;
-                const dy = e.touches[0].clientY - e.touches[1].clientY;
-                initialPinchDistance = Math.sqrt(dx * dx + dy * dy);
-
-                if (target && target === canvas.getActiveObject()) {
-                    pinchMode = 'object';
-                    initialObjectScale = target.scaleX;
-                    initialObjectAngle = target.angle;
-                    initialAngle = Math.atan2(dy, dx);
-                } else {
-                    pinchMode = 'canvas';
-                    initialPinchZoom = canvas.getZoom();
-                }
-            }
-        }, { passive: false });
-
-        canvas.upperCanvasEl.addEventListener('touchmove', function(e) {
-            if (e.touches.length === 2) {
-                e.preventDefault(); 
-                
-                const dx = e.touches[0].clientX - e.touches[1].clientX;
-                const dy = e.touches[0].clientY - e.touches[1].clientY;
-                const currentDistance = Math.sqrt(dx * dx + dy * dy);
-                
-                if (initialPinchDistance <= 0) return;
-
-                if (pinchMode === 'canvas') {
-                    const scale = currentDistance / initialPinchDistance;
-                    let newZoom = initialPinchZoom * scale;
-                    if (newZoom > 5) newZoom = 5;
-                    if (newZoom < 0.1) newZoom = 0.1;
-                    
-                    const centerPoint = new fabric.Point(
-                        (e.touches[0].clientX + e.touches[1].clientX) / 2,
-                        (e.touches[0].clientY + e.touches[1].clientY) / 2
-                    );
-                    
-                    canvas.zoomToPoint({ x: centerPoint.x, y: centerPoint.y }, newZoom);
-                    
-                } else if (pinchMode === 'object') {
-                    const target = canvas.getActiveObject();
-                    if(target) {
-                        const scaleFactor = currentDistance / initialPinchDistance;
-                        let newScale = initialObjectScale * scaleFactor;
-                        if(newScale < 0.1) newScale = 0.1;
-                        target.scale(newScale);
-                        
-                        const currentAngle = Math.atan2(dy, dx);
-                        const angleDiff = currentAngle - initialAngle;
-                        const angleDeg = angleDiff * (180 / Math.PI);
-                        target.rotate(initialObjectAngle + angleDeg);
-                        
-                        target.setCoords();
-                        canvas.requestRenderAll();
-                    }
-                }
-            }
-        }, { passive: false });
-
-        canvas.upperCanvasEl.addEventListener('touchend', function(e) {
-            if (e.touches.length < 2) {
-                pinchMode = null;
-            }
-        });
-
-        // 5. 鼠标滚轮缩放
+        // Mouse Wheel Zoom
         canvas.on('mouse:wheel', function(opt) {
             const delta = opt.e.deltaY;
             let zoom = canvas.getZoom();
@@ -508,12 +453,52 @@
             opt.e.stopPropagation();
         });
 
-        // 长按逻辑变量
+        // Touch Pinch Zoom (双指缩放画布)
+        let initialDistance = 0;
+        let initialZoom = 1;
+        
+        canvas.upperCanvasEl.addEventListener('touchstart', function(e) {
+            if (e.touches.length === 2) {
+                isDraggingCanvas = false; // 双指时不拖拽
+                const dx = e.touches[0].clientX - e.touches[1].clientX;
+                const dy = e.touches[0].clientY - e.touches[1].clientY;
+                initialDistance = Math.sqrt(dx*dx + dy*dy);
+                initialZoom = canvas.getZoom();
+                e.preventDefault();
+            }
+        }, { passive: false });
+
+        canvas.upperCanvasEl.addEventListener('touchmove', function(e) {
+            if (e.touches.length === 2 && initialDistance > 0) {
+                e.preventDefault();
+                const dx = e.touches[0].clientX - e.touches[1].clientX;
+                const dy = e.touches[0].clientY - e.touches[1].clientY;
+                const currentDistance = Math.sqrt(dx*dx + dy*dy);
+                
+                const scale = currentDistance / initialDistance;
+                let newZoom = initialZoom * scale;
+                if (newZoom > 5) newZoom = 5;
+                if (newZoom < 0.1) newZoom = 0.1;
+                
+                const cx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+                const cy = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+                
+                canvas.zoomToPoint({ x: cx, y: cy }, newZoom);
+            }
+        }, { passive: false });
+        
+        canvas.upperCanvasEl.addEventListener('touchend', function(e) {
+            if(e.touches.length < 2) initialDistance = 0;
+        });
+
+
+        // --- 原有逻辑适配 ---
+
         let longPressTimer;
 
         function openContextMenu(opt) {
             const target = opt.target || canvas.getActiveObject();
-            if(!target) return;
+            if(!target || target === bgRect) return;
             
             canvas.setActiveObject(target);
             const type = target.type;
@@ -555,8 +540,11 @@
         }
 
         function changeBackgroundColor(color) {
-            canvas.setBackgroundImage(null, canvas.renderAll.bind(canvas));
-            canvas.setBackgroundColor(color, () => { canvas.renderAll(); triggerAutoSave(); });
+            if(bgRect) {
+                bgRect.set('fill', color);
+                canvas.requestRenderAll();
+                triggerAutoSave();
+            }
         }
 
         function handleBgFile(files) {
@@ -569,9 +557,11 @@
 
         function applyPattern(imgSrc) {
             fabric.util.loadImage(imgSrc, function(img) {
-                if(!img) return;
+                if(!img || !bgRect) return;
                 const pattern = new fabric.Pattern({ source: img, repeat: 'repeat' });
-                canvas.setBackgroundColor(pattern, () => { canvas.renderAll(); triggerAutoSave(); });
+                bgRect.set('fill', pattern);
+                canvas.requestRenderAll();
+                triggerAutoSave();
             });
         }
 
@@ -580,12 +570,9 @@
         
         function executeClear() {
             canvas.clear(); 
-            canvas.setBackgroundColor('#ffffff', canvas.renderAll.bind(canvas));
-            canvas.setViewportTransform([1, 0, 0, 1, 0, 0]); 
-            screenCount = 1; canvas.setWidth(SCREEN_WIDTH); 
-            drawGrid();
-            initViewport(); 
-            
+            screenCount = 1; 
+            updateWorkspace();
+            initViewport();
             if(db) { const tx = db.transaction(STORE_NAME, "readwrite"); tx.objectStore(STORE_NAME).delete("last_session"); }
             statusIndicator.innerText = "画布已重置"; statusIndicator.classList.add('visible');
             closeModal();
@@ -681,9 +668,7 @@
                 case 'duplicate':
                     obj.clone(function(cloned) {
                         canvas.discardActiveObject();
-                        cloned.set({ 
-                            left: obj.left + 20, top: obj.top + 20, evented: true
-                        });
+                        cloned.set({ left: obj.left + 20, top: obj.top + 20, evented: true });
                         if(cloned.type === 'i-text' || cloned.type === 'text') cloned.set('objectCaching', false);
                         if (cloned.type === 'activeSelection') {
                             cloned.canvas = canvas;
@@ -708,6 +693,9 @@
                 case 'weight-up': if (obj.type === 'i-text' || obj.type === 'text') { let current = parseInt(obj.fontWeight) || 600; if(current === 'normal') current = 400; if(current === 'bold') current = 700; let next = FONT_WEIGHTS.find(w => w > current); if (!next) next = FONT_WEIGHTS[FONT_WEIGHTS.length - 1]; obj.set('fontWeight', next); } break;
                 case 'weight-down': if (obj.type === 'i-text' || obj.type === 'text') { let current = parseInt(obj.fontWeight) || 600; if(current === 'normal') current = 400; if(current === 'bold') current = 700; let prev = [...FONT_WEIGHTS].reverse().find(w => w < current); if (!prev) prev = FONT_WEIGHTS[0]; obj.set('fontWeight', prev); } break;
             }
+            // 保持背景纸在底层
+            if(bgRect) canvas.sendToBack(bgRect);
+            
             bringGridToFront(); canvas.renderAll(); triggerAutoSave();
             contextMenu.style.display = 'none';
         }
@@ -722,7 +710,11 @@
         function saveState() {
             if (!db) return;
             statusIndicator.innerText = "保存中..."; statusIndicator.classList.add('visible', 'status-saving');
+            // 移除 bgRect 再保存，防止重复堆叠
+            if(bgRect) canvas.remove(bgRect);
             const json = canvas.toJSON();
+            if(bgRect) { canvas.add(bgRect); canvas.sendToBack(bgRect); } // 加回来显示
+
             const tx = db.transaction(STORE_NAME, "readwrite");
             tx.objectStore(STORE_NAME).put({ id: "autosave", canvas: json, screenCount: screenCount, updated: new Date().getTime() }, "last_session");
             tx.oncomplete = () => { 
@@ -735,9 +727,11 @@
             tx.objectStore(STORE_NAME).get("last_session").onsuccess = (e) => {
                 const data = e.target.result;
                 if (data) {
-                    screenCount = data.screenCount || 1; canvas.setWidth(SCREEN_WIDTH * screenCount);
+                    screenCount = data.screenCount || 1; 
                     canvas.loadFromJSON(data.canvas, () => {
+                        updateWorkspace(); // 重建白纸
                         canvas.getObjects().forEach(obj => { 
+                            if(obj === bgRect) return;
                             if(obj.type === 'image') {
                                 obj.setControlsVisibility({ mt: false, mb: false, ml: false, mr: false });
                                 obj.set('noScaleCache', false); 
@@ -747,12 +741,12 @@
                                 obj.set('objectCaching', false);
                             }
                         });
-                        drawGrid(); canvas.renderAll(); 
-                        initViewport(); // 加载后自适应
+                        drawGrid(); 
+                        initViewport(); 
                         statusIndicator.innerText = "已恢复进度"; statusIndicator.classList.add('visible');
                         setTimeout(() => statusIndicator.classList.remove('visible'), 2000);
                     });
-                } else { drawGrid(); initViewport(); }
+                } else { updateWorkspace(); drawGrid(); initViewport(); }
             };
         }
         function triggerAutoSave() {
@@ -766,7 +760,7 @@
             gridLines.forEach(l => canvas.remove(l)); gridLines = [];
             for (let i = 1; i < screenCount; i++) {
                 const line = new fabric.Line([i * SCREEN_WIDTH, 0, i * SCREEN_WIDTH, SCREEN_HEIGHT], {
-                    stroke: '#007AFF', strokeWidth: 1, strokeDashArray: [3, 3], opacity: 0.5, selectable: false, evented: false, excludeFromExport: true
+                    stroke: '#007AFF', strokeWidth: 1, strokeDashArray: [5, 5], opacity: 0.3, selectable: false, evented: false, excludeFromExport: true
                 });
                 canvas.add(line); gridLines.push(line);
             }
@@ -774,8 +768,8 @@
         }
         function bringGridToFront() { gridLines.forEach(l => l.bringToFront()); }
         
-        function addScreen() { screenCount++; canvas.setWidth(SCREEN_WIDTH * screenCount); drawGrid(); canvas.renderAll(); triggerAutoSave(); }
-        function removeScreen() { if (screenCount > 1) { screenCount--; canvas.setWidth(SCREEN_WIDTH * screenCount); drawGrid(); canvas.renderAll(); triggerAutoSave(); } }
+        function addScreen() { screenCount++; updateWorkspace(); canvas.renderAll(); triggerAutoSave(); }
+        function removeScreen() { if (screenCount > 1) { screenCount--; updateWorkspace(); canvas.renderAll(); triggerAutoSave(); } }
         
         function handleFiles(files) {
             if (!files) return;
@@ -802,17 +796,21 @@
             if (typeof JSZip === 'undefined') { alert("ZIP 库未加载，请检查网络或刷新重试。"); return; }
             statusIndicator.innerText = "正在打包..."; statusIndicator.classList.add('visible', 'status-saving');
             
+            // 导出前保护现场
             const originalVpt = canvas.viewportTransform.slice();
             const originalWidth = canvas.width;
             const originalHeight = canvas.height;
 
-            // 导出时：重置视口到 bgRect 大小
+            // 归位
             canvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
             canvas.setWidth(screenCount * SCREEN_WIDTH);
             canvas.setHeight(SCREEN_HEIGHT);
             
-            // 隐藏网格线
             gridLines.forEach(l => l.visible = false);
+            // 导出时不需要背景纸的阴影，可以临时去掉，或者保留看需求
+            // 这里我们隐藏背景纸的 shadow，因为导出通常是纯平面的
+            const oldShadow = bgRect.shadow;
+            bgRect.set('shadow', null);
             
             canvas.renderAll();
 
@@ -835,11 +833,12 @@
                 console.error(e); alert("导出失败");
                 statusIndicator.innerText = "导出失败"; statusIndicator.classList.remove('status-saving');
             } finally {
-                // 恢复视口
+                // 恢复现场
                 canvas.setViewportTransform(originalVpt);
                 canvas.setWidth(originalWidth);
                 canvas.setHeight(originalHeight);
                 gridLines.forEach(l => l.visible = true);
+                bgRect.set('shadow', oldShadow); // 恢复阴影
                 canvas.requestRenderAll();
             }
         }
