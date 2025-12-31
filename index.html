@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Spark Canvas - V42.1 (移动端漫游修复版)</title>
+    <title>Spark Canvas - V43 (移动端完美交互版)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     
@@ -19,27 +19,27 @@
         #status-indicator.visible { opacity: 1; }
         .status-saved { color: #32D74B !important; } .status-saving { color: #FFD700 !important; }
 
-        /* 修复滚动容器：确保 overflow-y 是 auto，且允许惯性滚动 */
+        /* 滚动容器 */
         #canvas-wrapper { 
             flex: 1; width: 100%; display: flex; justify-content: center; 
-            overflow-y: auto; 
+            overflow-y: auto; /* 必须：允许垂直滚动 */
             overflow-x: hidden;
             padding-top: 20px;
             align-items: flex-start;
-            -webkit-overflow-scrolling: touch; /* iOS 惯性滚动关键属性 */
-            padding-bottom: 120px; /* 底部留出足够空间，防止内容被工具栏遮挡 */
+            -webkit-overflow-scrolling: touch; 
+            padding-bottom: 120px; 
         }
         
-        /* 增加画布容器的触摸反馈 */
         .canvas-container { 
             box-shadow: 0 0 80px rgba(0,0,0,0.5); 
             border: 1px solid #333; 
             transform-origin: top center; 
             transition: transform 0.3s ease;
-            touch-action: none; /* 默认由 Fabric 接管触摸 */
+            /* 默认状态下禁止浏览器处理触摸，由 Fabric 接管 (用于拖拽、缩放) */
+            touch-action: none; 
         }
 
-        /* 底部工具栏 (V41样式) */
+        /* 底部工具栏 */
         .toolbar { 
             position: fixed; bottom: 25px; 
             background: var(--panel-bg); padding: 10px 15px; 
@@ -66,7 +66,7 @@
         button.danger { background: rgba(255, 69, 58, 0.1); border-color: var(--danger-color); color: var(--danger-color); }
         button.danger:hover { background: var(--danger-color); color: white; }
         
-        /* 激活状态 (抓手模式) */
+        /* 激活状态 */
         button.active { background: #fff; color: #000; border-color: #fff; box-shadow: 0 0 10px rgba(255,255,255,0.5); }
 
         .font-select-wrapper { position: relative; width: 40px; height: 40px; }
@@ -285,7 +285,7 @@
             width: SCREEN_WIDTH * screenCount, height: SCREEN_HEIGHT,
             backgroundColor: '#ffffff', preserveObjectStacking: true, 
             fireRightClick: true, stopContextMenu: true,
-            allowTouchScrolling: true 
+            allowTouchScrolling: false // 初始禁止滚动，由 Pan Mode 控制
         });
 
         let gridLines = [];
@@ -299,35 +299,95 @@
         const DB_NAME = "SparkCanvasDB"; const STORE_NAME = "sessions";
         let db; let saveTimeout;
 
-        // --- 核心修复：移动端滚动逻辑 ---
+        // --- V43 核心: 移动端滚动 + 双指缩放 ---
+        
         let isPanMode = false;
 
         function togglePanMode() {
             isPanMode = !isPanMode;
-            
             panBtn.innerText = isPanMode ? "✋" : "👆";
-            if (isPanMode) {
-                panBtn.classList.add('active');
-            } else {
-                panBtn.classList.remove('active');
-            }
+            
+            const container = document.querySelector('.canvas-container');
+            const upperCanvas = canvas.upperCanvasEl;
 
-            // 关键：切换画布层的 pointer-events
-            // isPanMode=true 时，让 upperCanvas 透传事件，这样就可以滚动 div 了
             if (isPanMode) {
-                canvas.upperCanvasEl.style.pointerEvents = 'none';
+                // 浏览模式：允许浏览器滚动，穿透画布
+                panBtn.classList.add('active');
+                
+                canvas.allowTouchScrolling = true; // Fabric 允许滚动
+                container.style.touchAction = 'pan-y'; // CSS 允许垂直滚动
+                upperCanvas.style.pointerEvents = 'none'; // 关键：事件穿透，让手指直接滑到 wrapper 上
+                
                 canvas.selection = false;
                 canvas.discardActiveObject();
                 contextMenu.style.display = 'none';
                 bgPanel.style.display = 'none';
             } else {
-                canvas.upperCanvasEl.style.pointerEvents = 'auto';
+                // 编辑模式：禁止浏览器滚动，Fabric 接管触摸
+                panBtn.classList.remove('active');
+                
+                canvas.allowTouchScrolling = false;
+                container.style.touchAction = 'none'; // 禁止默认滚动
+                upperCanvas.style.pointerEvents = 'auto'; // 恢复事件响应
+                
                 canvas.selection = true;
             }
-            
             canvas.requestRenderAll();
         }
 
+        // --- 双指缩放逻辑 (Pinch to Zoom) ---
+        let initialDistance = 0;
+        let initialScale = 1;
+        let activeObjectForPinch = null;
+
+        canvas.upperCanvasEl.addEventListener('touchstart', function(e) {
+            if (isPanMode) return; // 浏览模式下不处理
+            if (e.touches.length === 2) {
+                // 获取当前选中的对象，或者是手指下的对象
+                activeObjectForPinch = canvas.getActiveObject() || canvas.findTarget(e);
+                if (activeObjectForPinch) {
+                    // 计算初始距离
+                    const dx = e.touches[0].clientX - e.touches[1].clientX;
+                    const dy = e.touches[0].clientY - e.touches[1].clientY;
+                    initialDistance = Math.sqrt(dx * dx + dy * dy);
+                    initialScale = activeObjectForPinch.scaleX;
+                    e.preventDefault(); // 阻止浏览器默认缩放
+                }
+            }
+        }, { passive: false });
+
+        canvas.upperCanvasEl.addEventListener('touchmove', function(e) {
+            if (isPanMode) return;
+            if (e.touches.length === 2 && activeObjectForPinch) {
+                // 计算新距离
+                const dx = e.touches[0].clientX - e.touches[1].clientX;
+                const dy = e.touches[0].clientY - e.touches[1].clientY;
+                const currentDistance = Math.sqrt(dx * dx + dy * dy);
+                
+                // 计算缩放比例
+                if (initialDistance > 0) {
+                    const scaleFactor = currentDistance / initialDistance;
+                    let newScale = initialScale * scaleFactor;
+                    
+                    // 限制最小最大缩放
+                    if (newScale < 0.1) newScale = 0.1;
+                    if (newScale > 5) newScale = 5;
+
+                    activeObjectForPinch.scale(newScale);
+                    activeObjectForPinch.setCoords(); // 更新坐标，防止无法点击
+                    canvas.requestRenderAll();
+                    triggerAutoSave();
+                }
+                e.preventDefault();
+            }
+        }, { passive: false });
+
+        canvas.upperCanvasEl.addEventListener('touchend', function() {
+            activeObjectForPinch = null;
+            initialDistance = 0;
+        });
+
+        // --- 适配逻辑 ---
         function adjustZoom() {
             const windowWidth = window.innerWidth;
             if (windowWidth < 560) {
@@ -353,7 +413,6 @@
 
         canvas.on('mouse:down', function(opt) {
             isDrag = false;
-            // 如果在抓手模式，直接退出，让浏览器处理
             if (isPanMode) return;
 
             if (bgPanel.style.display === 'block' && !opt.target) bgPanel.style.display = 'none';
@@ -411,6 +470,8 @@
             contextMenu.style.display = 'block';
             bgPanel.style.display = 'none';
         }
+
+        // --- 通用逻辑 ---
 
         function toggleBgPanel() {
             const isVisible = bgPanel.style.display === 'block';
