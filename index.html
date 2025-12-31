@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Spark Canvas - V55 (体验精修版)</title>
+    <title>Spark Canvas - V56 (交互精调版)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     
@@ -26,7 +26,7 @@
         #status-indicator.visible { opacity: 1; }
         .status-saved { color: #32D74B !important; } .status-saving { color: #FFD700 !important; }
 
-        /* 画布容器：统一深色背景 */
+        /* 画布容器 */
         #canvas-wrapper { 
             width: 100vw; height: 100vh; 
             overflow: hidden;
@@ -36,7 +36,6 @@
             display: flex; justify-content: center; align-items: center;
         }
         
-        /* 修复桌面端背景问题：强制 Canvas 元素透明，不遮挡 Wrapper 背景 */
         .canvas-container { 
             margin: 0 auto; 
             background: transparent !important; 
@@ -101,20 +100,37 @@
         .preset-dot { width: 100%; height: 100%; border-radius: 50%; cursor: pointer; border: 1px solid rgba(255,255,255,0.1); transition: transform 0.2s; }
         .preset-dot:hover { transform: scale(1.4); border-color: white; z-index: 2; box-shadow: 0 2px 5px rgba(0,0,0,0.5); }
 
-        #context-menu { display: none; position: absolute; z-index: 2000; width: 180px; background: rgba(40, 40, 40, 0.98); backdrop-filter: blur(20px); border: 1px solid #555; border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.8); padding: 8px; animation: menuFadeIn 0.15s ease-out; }
+        /* V56: 优化右键菜单尺寸，更紧凑 */
+        #context-menu { 
+            display: none; position: absolute; z-index: 2000; 
+            width: 150px; /* 缩小宽度 */
+            background: rgba(40, 40, 40, 0.98); backdrop-filter: blur(20px); 
+            border: 1px solid #555; border-radius: 12px; 
+            box-shadow: 0 10px 40px rgba(0,0,0,0.8); 
+            padding: 6px; /* 缩小内边距 */
+            animation: menuFadeIn 0.15s ease-out; 
+        }
         @keyframes menuFadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
-        .menu-header { font-size: 10px; color: #888; padding: 4px 8px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; display: none; }
-        .layer-controls { display: flex; justify-content: space-between; background: rgba(255,255,255,0.05); border-radius: 8px; padding: 4px; margin-bottom: 8px; }
-        .layer-btn { width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border-radius: 6px; cursor: pointer; font-size: 16px; color: #ccc; }
+        
+        .menu-header { font-size: 10px; color: #888; padding: 4px 6px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 2px; display: none; }
+        
+        .layer-controls { display: flex; justify-content: space-between; background: rgba(255,255,255,0.05); border-radius: 8px; padding: 4px; margin-bottom: 6px; }
+        .layer-btn { width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; border-radius: 6px; cursor: pointer; font-size: 14px; color: #ccc; }
         .layer-btn:hover { background: #555; color: white; }
-        .menu-item { display: none; align-items: center; padding: 10px 12px; font-size: 13px; color: #eee; cursor: pointer; border-radius: 8px; transition: background 0.1s; margin-bottom: 2px; }
+        
+        .menu-item { 
+            display: none; align-items: center; 
+            padding: 8px 10px; /* 缩小单项高度 */
+            font-size: 12px; /* 缩小字体 */
+            color: #eee; cursor: pointer; border-radius: 8px; transition: background 0.1s; margin-bottom: 2px; 
+        }
         .menu-item:hover, .menu-item:active { background: var(--accent-color); color: white; }
-        .menu-item.delete { color: var(--danger-color); margin-top: 6px; border-top: 1px solid #555; border-radius: 0 0 8px 8px; }
+        .menu-item.delete { color: var(--danger-color); margin-top: 4px; border-top: 1px solid #555; border-radius: 0 0 8px 8px; }
         .menu-item.delete:hover { background: var(--danger-color); color: white; }
-        .menu-icon-span { width: 24px; text-align: center; margin-right: 8px; font-size: 16px; }
+        .menu-icon-span { width: 20px; text-align: center; margin-right: 6px; font-size: 14px; }
 
-        .text-colors-container { display: flex; gap: 8px; padding: 4px 8px 8px 8px; justify-content: space-around; border-bottom: 1px solid #555; margin-bottom: 4px; }
-        .text-color-dot { width: 18px; height: 18px; border-radius: 50%; cursor: pointer; border: 1px solid rgba(255,255,255,0.2); transition: transform 0.2s; }
+        .text-colors-container { display: flex; gap: 6px; padding: 4px 6px 6px 6px; justify-content: space-around; border-bottom: 1px solid #555; margin-bottom: 4px; }
+        .text-color-dot { width: 16px; height: 16px; border-radius: 50%; cursor: pointer; border: 1px solid rgba(255,255,255,0.2); transition: transform 0.2s; }
         .text-color-dot:hover { transform: scale(1.2); border-color: white; }
 
         .align-toolbar { display: flex; gap: 4px; background: rgba(255,255,255,0.05); border-radius: 8px; padding: 4px; margin-bottom: 4px; }
@@ -299,7 +315,7 @@
         let db; let saveTimeout;
 
         // ==========================================
-        // V55: 画纸遮罩 + 视觉优化 + 交互精修
+        // V56: V55 的基础上，修复右键误触，缩小菜单
         // ==========================================
         
         let bgRect; 
@@ -307,29 +323,23 @@
         function updateWorkspace() {
             if (bgRect) canvas.remove(bgRect);
             
-            // 1. 创建画纸
             bgRect = new fabric.Rect({
                 left: 0, top: 0,
                 width: screenCount * SCREEN_WIDTH,
                 height: SCREEN_HEIGHT,
                 fill: '#ffffff',
                 selectable: false, evented: false, 
-                // 去掉 shadow，改用视觉对比和 clipPath
-                // shadow: new fabric.Shadow(...) // ClipPath 会切掉阴影，所以这里不需要 Fabric 的阴影
             });
             canvas.add(bgRect);
             canvas.sendToBack(bgRect);
 
-            // 2. 核心：应用遮罩 (ClipPath)
-            // 这会让画纸外的所有内容（图片/文字）都不可见
             canvas.clipPath = new fabric.Rect({
                 left: 0, top: 0,
                 width: screenCount * SCREEN_WIDTH,
                 height: SCREEN_HEIGHT,
-                absolutePositioned: false // 跟随视口移动
+                absolutePositioned: false 
             });
 
-            // 3. 重绘网格
             gridLines.forEach(l => canvas.remove(l)); 
             gridLines = [];
             for (let i = 1; i < screenCount; i++) {
@@ -374,20 +384,20 @@
         // Mouse/Touch Down
         canvas.on('mouse:down', function(opt) {
             const evt = opt.e;
-            
+            const target = opt.target;
+
             // 右键处理
             if (opt.button === 3) {
-                if (opt.target && opt.target !== bgRect) {
-                    canvas.setActiveObject(opt.target);
+                if (target && target !== bgRect) {
+                    canvas.setActiveObject(target);
                     openContextMenu(opt);
                 }
                 return;
             }
 
-            const target = canvas.findTarget(evt) || opt.target;
             const active = canvas.getActiveObject();
 
-            // 如果点击了背景（null）或者点击了 bgRect（画纸）
+            // 拖拽画布判定：点背景(null) 或 点画纸(bgRect) 且 没在操作物体
             if (!target || target === bgRect) {
                 if (!active || target !== active) {
                     isDraggingCanvas = true;
@@ -408,21 +418,22 @@
             if (bgPanel.style.display === 'block') bgPanel.style.display = 'none';
             contextMenu.style.display = 'none';
             
-            // 长按菜单逻辑优化：检查是否点中控制点
+            // --- V56 关键修复：长按逻辑 ---
             if (target && target !== bgRect && evt.type === 'touchstart') {
                 isDraggingCanvas = false;
                 
-                // 核心判定：如果点中了控制角，不触发长按菜单
-                // _findControl 是 Fabric 内部方法，返回控制点名称或 undefined
-                const isControl = target._findControl && target._findControl(opt.pointer);
-                
-                if (!isControl) {
-                    longPressTimer = setTimeout(() => {
-                        if (!canvas.isDrawingMode && !isDraggingCanvas && !canvas.getActiveObject().isMoving) {
-                            openContextMenu(opt);
-                        }
-                    }, 500);
+                // 1. 检查是否点中了控制点 (Corner)
+                // Fabric 会在点击控制点时给 target 设置 __corner 属性
+                if (target.__corner) {
+                    return; // 点了控制点，直接退出，不启动长按计时器
                 }
+
+                // 2. 启动计时器
+                longPressTimer = setTimeout(() => {
+                    if (!canvas.isDrawingMode && !isDraggingCanvas && !canvas.getActiveObject().isMoving) {
+                        openContextMenu(opt);
+                    }
+                }, 500);
             }
         });
 
@@ -475,7 +486,7 @@
             opt.e.stopPropagation();
         });
 
-        // Touch Pinch Zoom (纯缩放，无旋转)
+        // Pinch Zoom
         let initialDistance = 0;
         let initialZoom = 1;
         let initialObjectScale = 1;
@@ -496,7 +507,6 @@
                 if (target && target === canvas.getActiveObject()) {
                     pinchMode = 'object';
                     initialObjectScale = target.scaleX;
-                    // 不再记录角度，禁用旋转
                 } else {
                     pinchMode = 'canvas';
                     initialZoom = canvas.getZoom();
@@ -518,9 +528,12 @@
                     if (newZoom > 5) newZoom = 5;
                     if (newZoom < 0.1) newZoom = 0.1;
                     
-                    const cx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
-                    const cy = (e.touches[0].clientY + e.touches[1].clientY) / 2;
-                    canvas.zoomToPoint({ x: cx, y: cy }, newZoom);
+                    const centerPoint = new fabric.Point(
+                        (e.touches[0].clientX + e.touches[1].clientX) / 2,
+                        (e.touches[0].clientY + e.touches[1].clientY) / 2
+                    );
+                    
+                    canvas.zoomToPoint({ x: centerPoint.x, y: centerPoint.y }, newZoom);
                     
                 } else if (pinchMode === 'object') {
                     const target = canvas.getActiveObject();
@@ -529,9 +542,6 @@
                         let newScale = initialObjectScale * scaleFactor;
                         if(newScale < 0.1) newScale = 0.1;
                         target.scale(newScale);
-                        
-                        // 不再执行 rotate 逻辑
-                        
                         target.setCoords();
                         canvas.requestRenderAll();
                     }
@@ -578,8 +588,8 @@
                 y = opt.e.clientY;
             }
 
-            if (x + 180 > window.innerWidth) x = window.innerWidth - 190;
-            if (y + 350 > window.innerHeight) y = window.innerHeight - 360;
+            if (x + 150 > window.innerWidth) x = window.innerWidth - 160;
+            if (y + 300 > window.innerHeight) y = window.innerHeight - 310;
 
             contextMenu.style.left = x + 'px';
             contextMenu.style.top = y + 'px';
@@ -762,15 +772,10 @@
         function saveState() {
             if (!db) return;
             statusIndicator.innerText = "保存中..."; statusIndicator.classList.add('visible', 'status-saving');
-            // 移除 clipPath 再保存，不然加载会有问题
             canvas.clipPath = null;
             if(bgRect) canvas.remove(bgRect);
-            
             const json = canvas.toJSON();
-            
-            // 恢复
             updateWorkspace();
-            
             const tx = db.transaction(STORE_NAME, "readwrite");
             tx.objectStore(STORE_NAME).put({ id: "autosave", canvas: json, screenCount: screenCount, updated: new Date().getTime() }, "last_session");
             tx.oncomplete = () => { 
@@ -861,8 +866,6 @@
             canvas.setHeight(SCREEN_HEIGHT);
             
             gridLines.forEach(l => l.visible = false);
-            
-            // 导出时暂时移除 clipPath，否则可能切坏
             canvas.clipPath = null;
             
             canvas.renderAll();
@@ -890,7 +893,7 @@
                 canvas.setWidth(originalWidth);
                 canvas.setHeight(originalHeight);
                 gridLines.forEach(l => l.visible = true);
-                updateWorkspace(); // 恢复 clipPath
+                updateWorkspace();
                 canvas.requestRenderAll();
             }
         }
