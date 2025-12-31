@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Spark Canvas - V54 (右键修复版)</title>
+    <title>Spark Canvas - V55 (体验精修版)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     
@@ -26,16 +26,22 @@
         #status-indicator.visible { opacity: 1; }
         .status-saved { color: #32D74B !important; } .status-saving { color: #FFD700 !important; }
 
-        /* 画布容器 */
+        /* 画布容器：统一深色背景 */
         #canvas-wrapper { 
             width: 100vw; height: 100vh; 
             overflow: hidden;
             background-color: #121212; 
             background-image: radial-gradient(#333 1px, transparent 1px);
             background-size: 20px 20px;
+            display: flex; justify-content: center; align-items: center;
         }
         
-        .canvas-container { margin: 0 auto; }
+        /* 修复桌面端背景问题：强制 Canvas 元素透明，不遮挡 Wrapper 背景 */
+        .canvas-container { 
+            margin: 0 auto; 
+            background: transparent !important; 
+        }
+        canvas { background: transparent !important; }
 
         /* 底部工具栏 */
         .toolbar { 
@@ -241,7 +247,6 @@
         let screenCount = 1;
         fabric.textureSize = 2048; 
 
-        // 旋转图标
         const rotateIconImg = new Image();
         rotateIconImg.src = 'rotate.png';
         rotateIconImg.onload = function() { if(canvas) canvas.requestRenderAll(); }
@@ -265,7 +270,7 @@
             cornerStyle: 'circle', cornerColor: '#007AFF', borderColor: '#007AFF',
             transparentCorners: false, borderScaleFactor: 2, cornerSize: 10,
             centeredScaling: false, lockUniScaling: true,
-            lockMovementX: false, lockMovementY: false // V54: 恢复默认允许移动
+            lockMovementX: false, lockMovementY: false
         });
 
         fabric.Object.prototype.controls.mtr = new fabric.Control({
@@ -294,7 +299,7 @@
         let db; let saveTimeout;
 
         // ==========================================
-        // V54 核心: 实体画纸 + 修复右键菜单
+        // V55: 画纸遮罩 + 视觉优化 + 交互精修
         // ==========================================
         
         let bgRect; 
@@ -302,17 +307,29 @@
         function updateWorkspace() {
             if (bgRect) canvas.remove(bgRect);
             
+            // 1. 创建画纸
             bgRect = new fabric.Rect({
                 left: 0, top: 0,
                 width: screenCount * SCREEN_WIDTH,
                 height: SCREEN_HEIGHT,
                 fill: '#ffffff',
-                selectable: false, evented: false, // 不响应事件，点击穿透给 canvas 容器
-                shadow: new fabric.Shadow({ color: 'rgba(0,0,0,0.5)', blur: 60, offsetX: 0, offsetY: 20 })
+                selectable: false, evented: false, 
+                // 去掉 shadow，改用视觉对比和 clipPath
+                // shadow: new fabric.Shadow(...) // ClipPath 会切掉阴影，所以这里不需要 Fabric 的阴影
             });
             canvas.add(bgRect);
             canvas.sendToBack(bgRect);
 
+            // 2. 核心：应用遮罩 (ClipPath)
+            // 这会让画纸外的所有内容（图片/文字）都不可见
+            canvas.clipPath = new fabric.Rect({
+                left: 0, top: 0,
+                width: screenCount * SCREEN_WIDTH,
+                height: SCREEN_HEIGHT,
+                absolutePositioned: false // 跟随视口移动
+            });
+
+            // 3. 重绘网格
             gridLines.forEach(l => canvas.remove(l)); 
             gridLines = [];
             for (let i = 1; i < screenCount; i++) {
@@ -349,7 +366,7 @@
             initViewport();
         }, 100);
 
-        // --- 交互逻辑 (Infinite Canvas + Right Click Fix) ---
+        // --- 交互逻辑 ---
         
         let isDraggingCanvas = false;
         let lastX, lastY;
@@ -357,47 +374,55 @@
         // Mouse/Touch Down
         canvas.on('mouse:down', function(opt) {
             const evt = opt.e;
-            const target = opt.target;
-
-            // V54 修复：如果是右键点击 (Button 3)，直接走菜单逻辑，不进入拖拽
+            
+            // 右键处理
             if (opt.button === 3) {
-                if (target && target !== bgRect) {
-                    canvas.setActiveObject(target);
+                if (opt.target && opt.target !== bgRect) {
+                    canvas.setActiveObject(opt.target);
                     openContextMenu(opt);
                 }
-                return; // 结束，不往下走
+                return;
             }
 
-            // 左键/触摸点击
-            if (bgPanel.style.display === 'block') bgPanel.style.display = 'none';
-            contextMenu.style.display = 'none';
+            const target = canvas.findTarget(evt) || opt.target;
+            const active = canvas.getActiveObject();
 
-            // 判断是否应该拖拽画布
-            // 如果点击了背景（null）或者点击了 bgRect（画纸），且不是在操作物体
+            // 如果点击了背景（null）或者点击了 bgRect（画纸）
             if (!target || target === bgRect) {
-                isDraggingCanvas = true;
-                canvas.selection = false;
-                
-                if(evt.type === 'touchstart') {
-                    lastX = evt.touches[0].clientX;
-                    lastY = evt.touches[0].clientY;
-                } else {
-                    lastX = evt.clientX;
-                    lastY = evt.clientY;
+                if (!active || target !== active) {
+                    isDraggingCanvas = true;
+                    canvas.selection = false;
+                    
+                    if(evt.type === 'touchstart') {
+                        lastX = evt.touches[0].clientX;
+                        lastY = evt.touches[0].clientY;
+                    } else {
+                        lastX = evt.clientX;
+                        lastY = evt.clientY;
+                    }
                 }
             } else {
-                // 点击了物体，交给 Fabric 处理移动/缩放
                 isDraggingCanvas = false;
             }
             
-            // 移动端长按菜单 (模拟右键)
+            if (bgPanel.style.display === 'block') bgPanel.style.display = 'none';
+            contextMenu.style.display = 'none';
+            
+            // 长按菜单逻辑优化：检查是否点中控制点
             if (target && target !== bgRect && evt.type === 'touchstart') {
                 isDraggingCanvas = false;
-                longPressTimer = setTimeout(() => {
-                    if (!canvas.isDrawingMode && !isDraggingCanvas && !canvas.getActiveObject().isMoving) {
-                        openContextMenu(opt);
-                    }
-                }, 500);
+                
+                // 核心判定：如果点中了控制角，不触发长按菜单
+                // _findControl 是 Fabric 内部方法，返回控制点名称或 undefined
+                const isControl = target._findControl && target._findControl(opt.pointer);
+                
+                if (!isControl) {
+                    longPressTimer = setTimeout(() => {
+                        if (!canvas.isDrawingMode && !isDraggingCanvas && !canvas.getActiveObject().isMoving) {
+                            openContextMenu(opt);
+                        }
+                    }, 500);
+                }
             }
         });
 
@@ -438,7 +463,7 @@
             clearTimeout(longPressTimer);
         });
 
-        // Mouse Wheel Zoom
+        // Mouse Wheel
         canvas.on('mouse:wheel', function(opt) {
             const delta = opt.e.deltaY;
             let zoom = canvas.getZoom();
@@ -450,12 +475,11 @@
             opt.e.stopPropagation();
         });
 
-        // Touch Pinch Zoom
+        // Touch Pinch Zoom (纯缩放，无旋转)
         let initialDistance = 0;
         let initialZoom = 1;
         let initialObjectScale = 1;
-        let initialObjectAngle = 0;
-        let initialAngle = 0;
+        let activeObjectForPinch = null;
         let pinchMode = null; 
 
         canvas.upperCanvasEl.addEventListener('touchstart', function(e) {
@@ -472,8 +496,7 @@
                 if (target && target === canvas.getActiveObject()) {
                     pinchMode = 'object';
                     initialObjectScale = target.scaleX;
-                    initialObjectAngle = target.angle;
-                    initialAngle = Math.atan2(dy, dx);
+                    // 不再记录角度，禁用旋转
                 } else {
                     pinchMode = 'canvas';
                     initialZoom = canvas.getZoom();
@@ -507,10 +530,7 @@
                         if(newScale < 0.1) newScale = 0.1;
                         target.scale(newScale);
                         
-                        const currentAngle = Math.atan2(dy, dx);
-                        const angleDiff = currentAngle - initialAngle;
-                        const angleDeg = angleDiff * (180 / Math.PI);
-                        target.rotate(initialObjectAngle + angleDeg);
+                        // 不再执行 rotate 逻辑
                         
                         target.setCoords();
                         canvas.requestRenderAll();
@@ -526,7 +546,7 @@
             }
         });
 
-        // --- 菜单逻辑 ---
+        // --- 菜单与功能 ---
         let longPressTimer;
 
         function openContextMenu(opt) {
@@ -742,10 +762,15 @@
         function saveState() {
             if (!db) return;
             statusIndicator.innerText = "保存中..."; statusIndicator.classList.add('visible', 'status-saving');
+            // 移除 clipPath 再保存，不然加载会有问题
+            canvas.clipPath = null;
             if(bgRect) canvas.remove(bgRect);
+            
             const json = canvas.toJSON();
-            if(bgRect) { canvas.add(bgRect); canvas.sendToBack(bgRect); }
-
+            
+            // 恢复
+            updateWorkspace();
+            
             const tx = db.transaction(STORE_NAME, "readwrite");
             tx.objectStore(STORE_NAME).put({ id: "autosave", canvas: json, screenCount: screenCount, updated: new Date().getTime() }, "last_session");
             tx.oncomplete = () => { 
@@ -836,8 +861,9 @@
             canvas.setHeight(SCREEN_HEIGHT);
             
             gridLines.forEach(l => l.visible = false);
-            const oldShadow = bgRect.shadow;
-            bgRect.set('shadow', null);
+            
+            // 导出时暂时移除 clipPath，否则可能切坏
+            canvas.clipPath = null;
             
             canvas.renderAll();
 
@@ -864,7 +890,7 @@
                 canvas.setWidth(originalWidth);
                 canvas.setHeight(originalHeight);
                 gridLines.forEach(l => l.visible = true);
-                bgRect.set('shadow', oldShadow); 
+                updateWorkspace(); // 恢复 clipPath
                 canvas.requestRenderAll();
             }
         }
