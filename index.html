@@ -2,8 +2,8 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
-    <title>Spark Canvas - V46 (自由漫游版)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Spark Canvas - V47 (完美滚动修复版)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     
@@ -14,7 +14,7 @@
     <style>
         :root { --bg-color: #1e1e1e; --panel-bg: rgba(45, 45, 45, 0.95); --accent-color: #007AFF; --danger-color: #ff453a; --text-color: #fff; --border-color: #444; }
         
-        /* 锁定页面主体，防止 iOS 橡皮筋效果 */
+        /* 锁定 Body，滚动交给 wrapper */
         html, body { 
             height: 100%; width: 100%; overflow: hidden; 
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
@@ -26,30 +26,40 @@
         #status-indicator.visible { opacity: 1; }
         .status-saved { color: #32D74B !important; } .status-saving { color: #FFD700 !important; }
 
-        /* V46 修复：允许双向滚动 (auto) */
+        /* 滚动容器：核心修复区域 */
         #canvas-wrapper { 
             height: 100%; width: 100%; 
-            overflow: auto; /* 允许 x 和 y 轴滚动 */
+            overflow-y: auto; /* 允许垂直滚动 */
+            overflow-x: auto; /* 允许水平滚动 (如果画布超宽) */
             display: flex; 
-            /* 居中显示，但如果是左对齐布局方便横向滚动，这里用 flex-start 配合 margin auto */
             align-items: flex-start; 
-            justify-content: flex-start; 
-            padding: 20px; /* 给画布周围留点呼吸空间 */
-            padding-bottom: 120px; /* 底部留白给工具栏 */
+            /* 保证内容少时居中，内容多时靠左开始滚 */
+            justify-content: center; 
+            padding: 20px 0 120px 0;
             box-sizing: border-box;
-            -webkit-overflow-scrolling: touch; 
+            -webkit-overflow-scrolling: touch; /* iOS 流畅滚动 */
         }
         
-        /* 为了让 justify-content: flex-start 时也能居中，我们在容器上加 margin: auto */
+        /* Canvas 容器样式 */
         .canvas-container { 
             box-shadow: 0 0 80px rgba(0,0,0,0.5); 
             border: 1px solid #333; 
-            transform-origin: top left; /* 缩放基点改为左上，配合 wrapper 滚动 */
+            transform-origin: top center; 
             transition: transform 0.3s ease;
-            margin: auto; /* 关键：在 flex 容器中自动居中 */
+            margin: 0 auto; /* 居中 */
             
-            /* V46: 默认允许浏览器接管所有手势 (滚动/缩放网页) */
-            touch-action: auto; 
+            /* V47 关键：默认允许垂直拖拽手势 (pan-y) 穿透 Canvas 
+               这意味着手指在 Canvas 上滑，默认是滚动页面 */
+            touch-action: pan-y !important; 
+        }
+
+        /* 当处于“拖拽模式”时，JS 会给 body 加这个类，强制接管手势 */
+        body.dragging-mode .canvas-container {
+            touch-action: none !important;
+        }
+        /* 当处于“拖拽模式”时，禁止 wrapper 滚动 */
+        body.dragging-mode #canvas-wrapper {
+            overflow: hidden !important;
         }
 
         /* 底部工具栏 */
@@ -63,7 +73,6 @@
             z-index: 100; border: 1px solid rgba(255,255,255,0.1); 
             box-sizing: border-box;
         }
-        
         .tool-group { display: flex; gap: 6px; align-items: center; }
         
         button { 
@@ -77,7 +86,6 @@
         button:active { transform: scale(0.95); }
         button.primary { background: var(--accent-color); border-color: var(--accent-color); color: white; }
         button.danger { background: rgba(255, 69, 58, 0.1); border-color: var(--danger-color); color: var(--danger-color); }
-        button.danger:hover { background: var(--danger-color); color: white; }
         
         .font-select-wrapper { position: relative; width: 40px; height: 40px; }
         .font-select-btn { 
@@ -102,34 +110,26 @@
         .panel-title { font-size: 12px; color: #888; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 1px; text-align: center; }
         .bg-options { display: flex; justify-content: space-between; gap: 10px; align-items: center; }
         .bg-option { width: 48px; height: 48px; border-radius: 8px; border: 2px solid #555; cursor: pointer; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; background-size: cover; background-position: center; transition: all 0.2s; }
-        .bg-option:hover { border-color: #fff; transform: scale(1.05); }
         .bg-option.add-btn { border: 2px dashed #666; color: #666; font-size: 24px; }
-        .bg-option.add-btn:hover { border-color: var(--accent-color); color: var(--accent-color); }
         .color-input-wrapper { background: conic-gradient(red, yellow, lime, cyan, blue, magenta, red); }
         input[type="color"] { opacity: 0; width: 100%; height: 100%; cursor: pointer; position: absolute; top:0; left:0; }
         .bg-preset-grid { width: 48px; height: 48px; display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr); gap: 4px; padding: 2px; background: rgba(255,255,255,0.05); border-radius: 8px; box-sizing: border-box; }
-        .preset-dot { width: 100%; height: 100%; border-radius: 50%; cursor: pointer; border: 1px solid rgba(255,255,255,0.1); transition: transform 0.2s; }
-        .preset-dot:hover { transform: scale(1.4); border-color: white; z-index: 2; box-shadow: 0 2px 5px rgba(0,0,0,0.5); }
+        .preset-dot { width: 100%; height: 100%; border-radius: 50%; cursor: pointer; border: 1px solid rgba(255,255,255,0.1); }
 
         #context-menu { display: none; position: absolute; z-index: 2000; width: 180px; background: rgba(40, 40, 40, 0.98); backdrop-filter: blur(20px); border: 1px solid #555; border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.8); padding: 8px; animation: menuFadeIn 0.15s ease-out; }
         @keyframes menuFadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
         .menu-header { font-size: 10px; color: #888; padding: 4px 8px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; display: none; }
         .layer-controls { display: flex; justify-content: space-between; background: rgba(255,255,255,0.05); border-radius: 8px; padding: 4px; margin-bottom: 8px; }
         .layer-btn { width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border-radius: 6px; cursor: pointer; font-size: 16px; color: #ccc; }
-        .layer-btn:hover { background: #555; color: white; }
         .menu-item { display: none; align-items: center; padding: 10px 12px; font-size: 13px; color: #eee; cursor: pointer; border-radius: 8px; transition: background 0.1s; margin-bottom: 2px; }
         .menu-item:hover, .menu-item:active { background: var(--accent-color); color: white; }
         .menu-item.delete { color: var(--danger-color); margin-top: 6px; border-top: 1px solid #555; border-radius: 0 0 8px 8px; }
-        .menu-item.delete:hover { background: var(--danger-color); color: white; }
         .menu-icon-span { width: 24px; text-align: center; margin-right: 8px; font-size: 16px; }
 
         .text-colors-container { display: flex; gap: 8px; padding: 4px 8px 8px 8px; justify-content: space-around; border-bottom: 1px solid #555; margin-bottom: 4px; }
-        .text-color-dot { width: 18px; height: 18px; border-radius: 50%; cursor: pointer; border: 1px solid rgba(255,255,255,0.2); transition: transform 0.2s; }
-        .text-color-dot:hover { transform: scale(1.2); border-color: white; }
-
+        .text-color-dot { width: 18px; height: 18px; border-radius: 50%; cursor: pointer; border: 1px solid rgba(255,255,255,0.2); }
         .align-toolbar { display: flex; gap: 4px; background: rgba(255,255,255,0.05); border-radius: 8px; padding: 4px; margin-bottom: 4px; }
         .align-btn { flex: 1; text-align: center; padding: 6px 0; font-size: 12px; color: #ccc; cursor: pointer; border-radius: 6px; font-weight: bold; letter-spacing: 0; }
-        .align-btn:hover { background: #555; color: white; }
 
         .show-always { display: flex !important; } 
         .show-header { display: block !important; }
@@ -141,9 +141,7 @@
         .modal-actions { display: flex; gap: 10px; justify-content: center; }
         .modal-btn { flex: 1; padding: 10px; border-radius: 8px; cursor: pointer; border: none; font-size: 14px; font-weight: 600; }
         .modal-btn.cancel { background: #444; color: #fff; }
-        .modal-btn.cancel:hover { background: #555; }
         .modal-btn.confirm { background: var(--danger-color); color: white; }
-        .modal-btn.confirm:hover { background: #ff5b50; }
 
         #file-input, #bg-file-input { display: none; }
     </style>
@@ -283,7 +281,7 @@
             cornerStyle: 'circle', cornerColor: '#007AFF', borderColor: '#007AFF',
             transparentCorners: false, borderScaleFactor: 2, cornerSize: 10,
             centeredScaling: false, lockUniScaling: true,
-            // V45: 默认禁止移动，只有选中后才解开
+            // 默认所有对象【锁定移动】，除非被选中
             lockMovementX: true, lockMovementY: true 
         });
 
@@ -297,8 +295,9 @@
             width: SCREEN_WIDTH * screenCount, height: SCREEN_HEIGHT,
             backgroundColor: '#ffffff', preserveObjectStacking: true, 
             fireRightClick: true, stopContextMenu: true,
-            allowTouchScrolling: true, // 默认开启滚动
-            selection: false // 禁用框选
+            // V47 关键：告诉 Fabric 允许浏览器接管触摸滚动
+            allowTouchScrolling: true,
+            selection: false // 禁止框选
         });
 
         let gridLines = [];
@@ -312,54 +311,60 @@
         let db; let saveTimeout;
 
         // ==========================================
-        // V45 核心: 智能手势逻辑 (SCRL 模式)
+        // V47 核心: 智能手势系统 (SCRL 模式)
         // ==========================================
         
-        // 当对象被选中时：
-        // 1. 禁止浏览器滚动 (allowTouchScrolling = false)
-        // 2. 禁止容器层手势 (touch-action = none)，让 Fabric 完全接管
-        // 3. 解锁该对象的移动属性 (lockMovement = false)
-        canvas.on('selection:created', (e) => { handleObjectSelected(e); });
-        canvas.on('selection:updated', (e) => { handleObjectSelected(e); });
+        // 核心思路：
+        // 1. 默认状态：allowTouchScrolling=true (Fabric不管)，CSS touch-action=pan-y (浏览器管滚动)
+        // 2. 只有当用户真的按住了【当前已经选中】的物体，才禁止滚动，开启拖拽
 
-        function handleObjectSelected(e) {
-            if(e.selected && e.selected[0]) {
-                const obj = e.selected[0];
-                obj.set({ lockMovementX: false, lockMovementY: false });
-                
-                // 关键：告诉 Fabric 现在的触摸是用来操作画布的，不是滚动的
+        // 监听最原始的 touchstart，判断是否击中了【已选中】的物体
+        canvas.upperCanvasEl.addEventListener('touchstart', function(e) {
+            const active = canvas.getActiveObject();
+            const target = canvas.findTarget(e);
+
+            // 如果点击的是当前已经选中的对象 -> 准备拖拽，锁死页面滚动
+            if (active && target === active) {
                 canvas.allowTouchScrolling = false;
-                
-                // 关键：告诉浏览器不要处理触摸
-                const container = document.querySelector('.canvas-container');
-                if(container) container.style.touchAction = 'none';
+                document.body.classList.add('dragging-mode');
+            } else {
+                // 否则（点击背景，或者点击未选中的对象）-> 允许页面滚动
+                canvas.allowTouchScrolling = true;
+                document.body.classList.remove('dragging-mode');
             }
-        }
+        }, { passive: false });
 
-        // 当取消选中时：
-        // 1. 恢复浏览器滚动 (allowTouchScrolling = true)
-        // 2. 恢复容器层手势 (touch-action = pan-y)，允许用户滑动页面
-        // 3. 锁定所有对象的移动属性 (lockMovement = true)
+        // 监听选中事件：选中新物体时，解锁移动
+        canvas.on('selection:created', (e) => {
+            if(e.selected && e.selected[0]) {
+                e.selected[0].set({ lockMovementX: false, lockMovementY: false });
+                // 选中瞬间不需要禁止滚动，只有下次 touchstart 在上面时才禁止
+            }
+        });
+
+        canvas.on('selection:updated', (e) => {
+            if(e.selected && e.selected[0]) {
+                e.selected[0].set({ lockMovementX: false, lockMovementY: false });
+            }
+        });
+
         canvas.on('selection:cleared', (e) => {
+            // 恢复滚动模式
             canvas.allowTouchScrolling = true;
-            
-            const container = document.querySelector('.canvas-container');
-            if(container) container.style.touchAction = 'pan-y'; // 允许垂直和水平滚动(由wrapper处理)
+            document.body.classList.remove('dragging-mode');
 
-            // 锁定刚刚取消选中的对象
+            // 锁死刚才的对象
             if(e.deselected && e.deselected[0]) {
                 e.deselected[0].set({ lockMovementX: true, lockMovementY: true });
             }
-            // 保险起见，锁定全部
+            // 兜底：锁死所有对象
             canvas.forEachObject(o => o.set({ lockMovementX: true, lockMovementY: true }));
             
             contextMenu.style.display = 'none';
             bgPanel.style.display = 'none';
         });
 
-        // ----------------------------------------------------
-        // 双指缩放 (Pinch to Zoom) 保持不变，它需要配合 selection 状态
-        // ----------------------------------------------------
+        // --- 双指缩放 (Pinch) ---
         let initialDistance = 0;
         let initialScale = 1;
         let activeObjectForPinch = null;
@@ -368,10 +373,9 @@
 
         canvas.upperCanvasEl.addEventListener('touchstart', function(e) {
             if (e.touches.length === 2) {
-                // 双指直接强制进入编辑模式
+                // 双指直接接管
                 canvas.allowTouchScrolling = false;
-                const container = document.querySelector('.canvas-container');
-                if(container) container.style.touchAction = 'none';
+                document.body.classList.add('dragging-mode');
 
                 const target = canvas.findTarget(e) || canvas.getActiveObject();
                 if (target) {
@@ -419,19 +423,16 @@
             }
         });
 
-        // 适配逻辑
+        // --- 适配逻辑 ---
         function adjustZoom() {
             const windowWidth = window.innerWidth;
             if (windowWidth < 560) {
                 const scale = (windowWidth - 20) / SCREEN_WIDTH;
                 const container = document.querySelector('.canvas-container');
-                // V45: 修改 transform-origin 为 top left，配合 margin auto 实现自动布局
                 if (container) {
                     container.style.transform = `scale(${scale})`;
                     const wrapper = document.getElementById('canvas-wrapper');
-                    // 高度需要撑开，但宽度由 wrapper 的 scroll 处理
-                    wrapper.style.height = '100%'; 
-                    // 容器本身不需要设高，fabric 会撑开 canvas 元素
+                    wrapper.style.height = '100%'; // 让wrapper负责滚动
                 }
             } else {
                 const container = document.querySelector('.canvas-container');
@@ -580,7 +581,7 @@
                 charSpacing: 0,
                 shadow: null,
                 objectCaching: false,
-                lockMovementX: false, // 刚创建时允许移动
+                lockMovementX: false, // 新建时允许移动
                 lockMovementY: false
             });
             text.setControlsVisibility({ mt: false, mb: false, ml: false, mr: false });
@@ -639,7 +640,7 @@
                         canvas.discardActiveObject();
                         cloned.set({ 
                             left: obj.left + 20, top: obj.top + 20, evented: true,
-                            lockMovementX: false, lockMovementY: false // 复制出来也是选中的，所以允许移动
+                            lockMovementX: false, lockMovementY: false
                         });
                         if(cloned.type === 'i-text' || cloned.type === 'text') cloned.set('objectCaching', false);
                         if (cloned.type === 'activeSelection') {
@@ -703,7 +704,7 @@
                                 obj.set('shadow', null);
                                 obj.set('objectCaching', false);
                             }
-                            // 初始加载时全部锁定
+                            // V47: 初始状态全部锁定
                             obj.set({ lockMovementX: true, lockMovementY: true });
                         });
                         drawGrid(); canvas.renderAll(); 
@@ -744,7 +745,7 @@
                         img.set({ 
                             left: (canvas.width - img.getScaledWidth()) / 2 + (Math.random() * 40 - 20), 
                             top: (canvas.height - img.getScaledHeight()) / 2 + (Math.random() * 40 - 20),
-                            lockMovementX: false, lockMovementY: false // 新建时允许移动
+                            lockMovementX: false, lockMovementY: false
                         });
                         img.setControlsVisibility({ mt: false, mb: false, ml: false, mr: false });
                         canvas.add(img); canvas.setActiveObject(img); bringGridToFront(); triggerAutoSave();
