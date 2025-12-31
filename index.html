@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Spark Canvas - V42.1 (移动端漫游修复版)</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300..900&family=Noto+Serif+SC:wght@300..900&display=swap" rel="stylesheet">
+
+    <style>
+        :root { --bg-color: #1e1e1e; --panel-bg: rgba(45, 45, 45, 0.95); --accent-color: #007AFF; --danger-color: #ff453a; --text-color: #fff; --border-color: #444; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: var(--bg-color); color: var(--text-color); margin: 0; display: flex; flex-direction: column; align-items: center; min-height: 100vh; user-select: none; overflow: hidden; }
+        
+        #status-indicator { position: fixed; top: 20px; font-size: 12px; color: #666; background: rgba(0,0,0,0.5); padding: 4px 12px; border-radius: 20px; transition: all 0.3s; font-weight: 500; z-index: 10; opacity: 0; pointer-events: none; }
+        #status-indicator.visible { opacity: 1; }
+        .status-saved { color: #32D74B !important; } .status-saving { color: #FFD700 !important; }
+
+        /* 修复滚动容器：确保 overflow-y 是 auto，且允许惯性滚动 */
+        #canvas-wrapper { 
+            flex: 1; width: 100%; display: flex; justify-content: center; 
+            overflow-y: auto; 
+            overflow-x: hidden;
+            padding-top: 20px;
+            align-items: flex-start;
+            -webkit-overflow-scrolling: touch; /* iOS 惯性滚动关键属性 */
+            padding-bottom: 120px; /* 底部留出足够空间，防止内容被工具栏遮挡 */
+        }
+        
+        /* 增加画布容器的触摸反馈 */
+        .canvas-container { 
+            box-shadow: 0 0 80px rgba(0,0,0,0.5); 
+            border: 1px solid #333; 
+            transform-origin: top center; 
+            transition: transform 0.3s ease;
+            touch-action: none; /* 默认由 Fabric 接管触摸 */
+        }
+
+        /* 底部工具栏 (V41样式) */
+        .toolbar { 
+            position: fixed; bottom: 25px; 
+            background: var(--panel-bg); padding: 10px 15px; 
+            border-radius: 18px; display: flex; 
+            width: 90vw; max-width: 500px; 
+            justify-content: space-between; 
+            box-shadow: 0 20px 50px rgba(0,0,0,0.6); backdrop-filter: blur(15px); 
+            z-index: 100; border: 1px solid rgba(255,255,255,0.1); 
+            box-sizing: border-box;
+        }
+        
+        .tool-group { display: flex; gap: 6px; align-items: center; }
+        
+        button { 
+            background: #3a3a3a; color: #ddd; border: 1px solid #555; 
+            width: 40px; height: 40px; padding: 0; border-radius: 10px; cursor: pointer; 
+            font-size: 18px; transition: all 0.2s; 
+            display: flex; align-items: center; justify-content: center; 
+            flex-shrink: 0; 
+        }
+        button:hover { background: #505050; color: white; transform: translateY(-2px); }
+        button:active { transform: scale(0.95); }
+        button.primary { background: var(--accent-color); border-color: var(--accent-color); color: white; }
+        button.danger { background: rgba(255, 69, 58, 0.1); border-color: var(--danger-color); color: var(--danger-color); }
+        button.danger:hover { background: var(--danger-color); color: white; }
+        
+        /* 激活状态 (抓手模式) */
+        button.active { background: #fff; color: #000; border-color: #fff; box-shadow: 0 0 10px rgba(255,255,255,0.5); }
+
+        .font-select-wrapper { position: relative; width: 40px; height: 40px; }
+        .font-select-btn { 
+            position: absolute; top:0; left:0; width: 100%; height: 100%; 
+            background: #3a3a3a; border: 1px solid #555; border-radius: 10px; 
+            display: flex; align-items: center; justify-content: center; 
+            color: #ddd; font-weight: bold; font-size: 14px; pointer-events: none; 
+        }
+        select.font-select {
+            opacity: 0; width: 100%; height: 100%; cursor: pointer; 
+            position: absolute; top:0; left:0; -webkit-appearance: none;
+        }
+
+        @media (max-width: 380px) {
+            .toolbar { padding: 10px 8px; }
+            .tool-group { gap: 4px; }
+            button, .font-select-wrapper { width: 36px; height: 36px; font-size: 16px; }
+        }
+
+        #bg-panel { display: none; position: absolute; bottom: 80px; left: 50%; transform: translateX(-50%); background: rgba(40, 40, 40, 0.98); backdrop-filter: blur(20px); border: 1px solid #555; border-radius: 16px; padding: 15px; box-shadow: 0 10px 40px rgba(0,0,0,0.8); z-index: 90; animation: panelUp 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275); width: 200px; }
+        @keyframes panelUp { from { opacity: 0; transform: translate(-50%, 20px); } to { opacity: 1; transform: translate(-50%, 0); } }
+        .panel-title { font-size: 12px; color: #888; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 1px; text-align: center; }
+        .bg-options { display: flex; justify-content: space-between; gap: 10px; align-items: center; }
+        .bg-option { width: 48px; height: 48px; border-radius: 8px; border: 2px solid #555; cursor: pointer; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; background-size: cover; background-position: center; transition: all 0.2s; }
+        .bg-option:hover { border-color: #fff; transform: scale(1.05); }
+        .bg-option.add-btn { border: 2px dashed #666; color: #666; font-size: 24px; }
+        .bg-option.add-btn:hover { border-color: var(--accent-color); color: var(--accent-color); }
+        .color-input-wrapper { background: conic-gradient(red, yellow, lime, cyan, blue, magenta, red); }
+        input[type="color"] { opacity: 0; width: 100%; height: 100%; cursor: pointer; position: absolute; top:0; left:0; }
+        .bg-preset-grid { width: 48px; height: 48px; display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr); gap: 4px; padding: 2px; background: rgba(255,255,255,0.05); border-radius: 8px; box-sizing: border-box; }
+        .preset-dot { width: 100%; height: 100%; border-radius: 50%; cursor: pointer; border: 1px solid rgba(255,255,255,0.1); transition: transform 0.2s; }
+        .preset-dot:hover { transform: scale(1.4); border-color: white; z-index: 2; box-shadow: 0 2px 5px rgba(0,0,0,0.5); }
+
+        #context-menu { display: none; position: absolute; z-index: 2000; width: 180px; background: rgba(40, 40, 40, 0.98); backdrop-filter: blur(20px); border: 1px solid #555; border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.8); padding: 8px; animation: menuFadeIn 0.15s ease-out; }
+        @keyframes menuFadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+        .menu-header { font-size: 10px; color: #888; padding: 4px 8px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; display: none; }
+        .layer-controls { display: flex; justify-content: space-between; background: rgba(255,255,255,0.05); border-radius: 8px; padding: 4px; margin-bottom: 8px; }
+        .layer-btn { width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border-radius: 6px; cursor: pointer; font-size: 16px; color: #ccc; }
+        .layer-btn:hover { background: #555; color: white; }
+        .menu-item { display: none; align-items: center; padding: 10px 12px; font-size: 13px; color: #eee; cursor: pointer; border-radius: 8px; transition: background 0.1s; margin-bottom: 2px; }
+        .menu-item:hover, .menu-item:active { background: var(--accent-color); color: white; }
+        .menu-item.delete { color: var(--danger-color); margin-top: 6px; border-top: 1px solid #555; border-radius: 0 0 8px 8px; }
+        .menu-item.delete:hover { background: var(--danger-color); color: white; }
+        .menu-icon-span { width: 24px; text-align: center; margin-right: 8px; font-size: 16px; }
+
+        .text-colors-container { display: flex; gap: 8px; padding: 4px 8px 8px 8px; justify-content: space-around; border-bottom: 1px solid #555; margin-bottom: 4px; }
+        .text-color-dot { width: 18px; height: 18px; border-radius: 50%; cursor: pointer; border: 1px solid rgba(255,255,255,0.2); transition: transform 0.2s; }
+        .text-color-dot:hover { transform: scale(1.2); border-color: white; }
+
+        .align-toolbar { display: flex; gap: 4px; background: rgba(255,255,255,0.05); border-radius: 8px; padding: 4px; margin-bottom: 4px; }
+        .align-btn { flex: 1; text-align: center; padding: 6px 0; font-size: 12px; color: #ccc; cursor: pointer; border-radius: 6px; font-weight: bold; letter-spacing: 0; }
+        .align-btn:hover { background: #555; color: white; }
+
+        .show-always { display: flex !important; } 
+        .show-header { display: block !important; }
+        
+        #confirm-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); backdrop-filter: blur(5px); z-index: 3000; animation: fadeIn 0.2s; }
+        .modal-box { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #2c2c2c; border: 1px solid #555; border-radius: 16px; padding: 25px; width: 280px; text-align: center; box-shadow: 0 20px 50px rgba(0,0,0,0.5); }
+        .modal-title { font-size: 18px; font-weight: bold; margin-bottom: 10px; color: white; }
+        .modal-desc { font-size: 14px; color: #aaa; margin-bottom: 20px; line-height: 1.5; }
+        .modal-actions { display: flex; gap: 10px; justify-content: center; }
+        .modal-btn { flex: 1; padding: 10px; border-radius: 8px; cursor: pointer; border: none; font-size: 14px; font-weight: 600; }
+        .modal-btn.cancel { background: #444; color: #fff; }
+        .modal-btn.cancel:hover { background: #555; }
+        .modal-btn.confirm { background: var(--danger-color); color: white; }
+        .modal-btn.confirm:hover { background: #ff5b50; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        #file-input, #bg-file-input { display: none; }
+    </style>
+</head>
+<body>
+    <div id="status-indicator">准备就绪</div>
+    <div id="canvas-wrapper"><canvas id="c"></canvas></div>
+
+    <div id="bg-panel">
+        <div class="panel-title">背景设置</div>
+        <div class="bg-options">
+            <div class="bg-option color-input-wrapper" title="自定义颜色">
+                <input type="color" id="bg-picker" value="#ffffff" onchange="changeBackgroundColor(this.value)">
+            </div>
+            <div class="bg-preset-grid">
+                <div class="preset-dot" style="background:#ffffff" onclick="changeBackgroundColor('#ffffff')"></div>
+                <div class="preset-dot" style="background:#f2f2f7" onclick="changeBackgroundColor('#f2f2f7')"></div>
+                <div class="preset-dot" style="background:#1c1c1e" onclick="changeBackgroundColor('#1c1c1e')"></div>
+                <div class="preset-dot" style="background:#fdf6e3" onclick="changeBackgroundColor('#fdf6e3')"></div>
+                <div class="preset-dot" style="background:#ffeff0" onclick="changeBackgroundColor('#ffeff0')"></div>
+                <div class="preset-dot" style="background:#eef6ff" onclick="changeBackgroundColor('#eef6ff')"></div>
+                <div class="preset-dot" style="background:#d4d4d4" onclick="changeBackgroundColor('#d4d4d4')"></div>
+                <div class="preset-dot" style="background:#333333" onclick="changeBackgroundColor('#333333')"></div>
+                <div class="preset-dot" style="background:#000000" onclick="changeBackgroundColor('#000000')"></div>
+            </div>
+            <div class="bg-option add-btn" onclick="document.getElementById('bg-file-input').click()">+</div>
+        </div>
+    </div>
+
+    <div id="confirm-modal">
+        <div class="modal-box">
+            <div class="modal-title">清空画布</div>
+            <div class="modal-desc">确定要清空所有内容吗？<br>此操作无法撤销。</div>
+            <div class="modal-actions">
+                <button class="modal-btn cancel" onclick="closeModal()">取消</button>
+                <button class="modal-btn confirm" onclick="executeClear()">确认清空</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="context-menu">
+        <div class="menu-header show-header">图层 Layer</div>
+        <div class="layer-controls">
+            <div class="layer-btn" onclick="menuAction('top')">⤒</div>
+            <div class="layer-btn" onclick="menuAction('up')">↑</div>
+            <div class="layer-btn" onclick="menuAction('down')">↓</div>
+            <div class="layer-btn" onclick="menuAction('bottom')">⤓</div>
+        </div>
+        
+        <div class="menu-header image-menu-item">效果 Effect</div>
+        <div class="menu-item image-menu-item" onclick="menuAction('flipX')"><span class="menu-icon-span">⇄</span> 水平翻转</div>
+        <div class="menu-item image-menu-item" onclick="menuAction('filter-bw')"><span class="menu-icon-span">◐</span> 黑白滤镜</div>
+        <div class="menu-item image-menu-item" onclick="menuAction('shadow')"><span class="menu-icon-span">❑</span> 投影</div>
+
+        <div class="menu-header text-menu-item">文字设置</div>
+        <div class="text-colors-container text-menu-item">
+            <div class="text-color-dot" style="background: #000000" onclick="changeTextColor('#000000')"></div>
+            <div class="text-color-dot" style="background: #ffffff" onclick="changeTextColor('#ffffff')"></div>
+            <div class="text-color-dot" style="background: #FFCC00" onclick="changeTextColor('#FFCC00')"></div>
+            <div class="text-color-dot" style="background: #34C759" onclick="changeTextColor('#34C759')"></div>
+            <div class="text-color-dot" style="background: #007AFF" onclick="changeTextColor('#007AFF')"></div>
+            <div class="text-color-dot" style="background: #FF3B30" onclick="changeTextColor('#FF3B30')"></div>
+        </div>
+        <div class="align-toolbar text-menu-item">
+            <div class="align-btn" onclick="menuAction('align-left')">|←</div>
+            <div class="align-btn" onclick="menuAction('align-center')">→|←</div>
+            <div class="align-btn" onclick="menuAction('align-right')">→|</div>
+        </div>
+        <div class="menu-item text-menu-item" onclick="menuAction('weight-up')"><span class="menu-icon-span">B↑</span> 增加字重</div>
+        <div class="menu-item text-menu-item" onclick="menuAction('weight-down')"><span class="menu-icon-span">B↓</span> 缩小字重</div>
+        <div class="menu-item text-menu-item" onclick="menuAction('spacing-up')"><span class="menu-icon-span">←→</span> 字间距 +</div>
+        <div class="menu-item text-menu-item" onclick="menuAction('spacing-down')"><span class="menu-icon-span">→←</span> 字间距 -</div>
+        <div class="menu-item text-menu-item" onclick="menuAction('line-height-up')"><span class="menu-icon-span">↕</span> 行间距 +</div>
+        <div class="menu-item text-menu-item" onclick="menuAction('line-height-down')"><span class="menu-icon-span">⇈</span> 行间距 -</div>
+
+        <div class="menu-item show-always" onclick="menuAction('duplicate')"><span class="menu-icon-span">❐</span> 复制</div>
+        <div class="menu-item delete show-always" onclick="menuAction('delete')"><span class="menu-icon-span">🗑</span> 删除</div>
+    </div>
+
+    <div class="toolbar">
+        <div class="tool-group">
+            <button id="pan-btn" onclick="togglePanMode()" title="切换: 👆编辑 / ✋浏览">👆</button>
+            <button onclick="document.getElementById('file-input').click()" class="primary" title="添加图片">🖼</button>
+            <button onclick="addText()" title="添加文字">T</button>
+            <div class="font-select-wrapper" title="选择字体">
+                <div class="font-select-btn">Aa</div>
+                <select id="font-family-selector" class="font-select" onchange="changeFont(this.value)">
+                    <option value="'Noto Sans SC', sans-serif">思源黑</option>
+                    <option value="'Noto Serif SC', serif">思源宋</option>
+                </select>
+            </div>
+        </div>
+        
+        <div class="tool-group">
+            <button onclick="removeScreen()" title="减少页面">📄-</button>
+            <button onclick="addScreen()" title="增加页面">📄+</button>
+        </div>
+
+        <div class="tool-group">
+            <button onclick="toggleBgPanel()" title="背景设置">▧</button>
+            <button class="danger" onclick="showModal()" title="清空">🗑</button>
+            <button class="primary" onclick="exportSlicesZip()" title="导出">➜</button>
+        </div>
+    </div>
+    
+    <input type="file" id="file-input" accept="image/*" multiple onchange="handleFiles(this.files)">
+    <input type="file" id="bg-file-input" accept="image/*" onchange="handleBgFile(this.files)">
+
+    <script>
+        const SCREEN_WIDTH = 540;
+        const SCREEN_HEIGHT = 960;
+        let screenCount = 1;
+        fabric.textureSize = 2048; 
+
+        // 旋转图标
+        const rotateIconImg = new Image();
+        rotateIconImg.src = 'rotate.png';
+        rotateIconImg.onload = function() { if(canvas) canvas.requestRenderAll(); }
+
+        function renderCustomIcon(ctx, left, top, styleOverride, fabricObject) {
+            const size = 20; 
+            ctx.save(); ctx.translate(left, top); ctx.rotate(fabric.util.degreesToRadians(fabricObject.angle));
+            ctx.beginPath(); ctx.arc(0, 0, size/2, 0, 2 * Math.PI); ctx.fillStyle = "#007AFF"; ctx.fill();
+            ctx.shadowColor = "rgba(0,0,0,0.3)"; ctx.shadowBlur = 3; ctx.shadowOffsetY = 1;
+            const iconSize = size * 0.7; 
+            if (rotateIconImg.complete && rotateIconImg.naturalWidth !== 0) {
+                 ctx.drawImage(rotateIconImg, -iconSize/2, -iconSize/2, iconSize, iconSize);
+            } else {
+                ctx.fillStyle = "white"; ctx.beginPath(); ctx.arc(0,0, 3, 0, 2*Math.PI); ctx.fill();
+            }
+            ctx.restore();
+        }
+
+        fabric.Object.prototype.set({
+            snapAngle: 90, snapThreshold: 3,
+            cornerStyle: 'circle', cornerColor: '#007AFF', borderColor: '#007AFF',
+            transparentCorners: false, borderScaleFactor: 2, cornerSize: 10,
+            centeredScaling: false, lockUniScaling: true
+        });
+
+        fabric.Object.prototype.controls.mtr = new fabric.Control({
+            x: 0, y: -0.5, offsetY: -25, 
+            actionHandler: fabric.controlsUtils.rotationWithSnapping,
+            cursorStyle: 'crosshair', render: renderCustomIcon, actionName: 'rotate'
+        });
+
+        const canvas = new fabric.Canvas('c', {
+            width: SCREEN_WIDTH * screenCount, height: SCREEN_HEIGHT,
+            backgroundColor: '#ffffff', preserveObjectStacking: true, 
+            fireRightClick: true, stopContextMenu: true,
+            allowTouchScrolling: true 
+        });
+
+        let gridLines = [];
+        const contextMenu = document.getElementById('context-menu');
+        const bgPanel = document.getElementById('bg-panel');
+        const statusIndicator = document.getElementById('status-indicator');
+        const confirmModal = document.getElementById('confirm-modal');
+        const fontSelector = document.getElementById('font-family-selector');
+        const panBtn = document.getElementById('pan-btn');
+
+        const DB_NAME = "SparkCanvasDB"; const STORE_NAME = "sessions";
+        let db; let saveTimeout;
+
+        // --- 核心修复：移动端滚动逻辑 ---
+        let isPanMode = false;
+
+        function togglePanMode() {
+            isPanMode = !isPanMode;
+            
+            panBtn.innerText = isPanMode ? "✋" : "👆";
+            if (isPanMode) {
+                panBtn.classList.add('active');
+            } else {
+                panBtn.classList.remove('active');
+            }
+
+            // 关键：切换画布层的 pointer-events
+            // isPanMode=true 时，让 upperCanvas 透传事件，这样就可以滚动 div 了
+            if (isPanMode) {
+                canvas.upperCanvasEl.style.pointerEvents = 'none';
+                canvas.selection = false;
+                canvas.discardActiveObject();
+                contextMenu.style.display = 'none';
+                bgPanel.style.display = 'none';
+            } else {
+                canvas.upperCanvasEl.style.pointerEvents = 'auto';
+                canvas.selection = true;
+            }
+            
+            canvas.requestRenderAll();
+        }
+
+        function adjustZoom() {
+            const windowWidth = window.innerWidth;
+            if (windowWidth < 560) {
+                const scale = (windowWidth - 20) / SCREEN_WIDTH;
+                const container = document.querySelector('.canvas-container');
+                if (container) {
+                    container.style.transform = `scale(${scale})`;
+                    const wrapper = document.getElementById('canvas-wrapper');
+                    wrapper.style.height = (canvas.getHeight() * scale + 50) + 'px';
+                }
+            } else {
+                const container = document.querySelector('.canvas-container');
+                if (container) container.style.transform = 'none';
+                const wrapper = document.getElementById('canvas-wrapper');
+                wrapper.style.height = 'auto';
+            }
+        }
+        window.addEventListener('resize', adjustZoom);
+        setTimeout(adjustZoom, 100);
+
+        let longPressTimer;
+        let isDrag = false;
+
+        canvas.on('mouse:down', function(opt) {
+            isDrag = false;
+            // 如果在抓手模式，直接退出，让浏览器处理
+            if (isPanMode) return;
+
+            if (bgPanel.style.display === 'block' && !opt.target) bgPanel.style.display = 'none';
+            if (opt.button === 3 && opt.target) {
+                openContextMenu(opt);
+                return;
+            } else {
+                contextMenu.style.display = 'none';
+            }
+
+            if (opt.target && opt.e.type === 'touchstart') {
+                longPressTimer = setTimeout(() => {
+                    if (!isDrag) {
+                        canvas.setActiveObject(opt.target);
+                        openContextMenu(opt);
+                    }
+                }, 500); 
+            }
+        });
+
+        canvas.on('mouse:move', function() { isDrag = true; clearTimeout(longPressTimer); });
+        canvas.on('mouse:up', function() { clearTimeout(longPressTimer); });
+
+        function openContextMenu(opt) {
+            canvas.setActiveObject(opt.target);
+            const type = opt.target.type;
+            const imageItems = document.querySelectorAll('.image-menu-item');
+            const textItems = document.querySelectorAll('.text-menu-item');
+
+            if (type === 'image') {
+                imageItems.forEach(el => el.style.display = 'flex');
+                textItems.forEach(el => el.style.display = 'none');
+            } else if (type === 'i-text' || type === 'text') {
+                imageItems.forEach(el => el.style.display = 'none');
+                textItems.forEach(el => el.style.display = 'flex');
+            } else {
+                imageItems.forEach(el => el.style.display = 'none');
+                textItems.forEach(el => el.style.display = 'none');
+            }
+
+            let x, y;
+            if (opt.e.changedTouches && opt.e.changedTouches[0]) {
+                x = opt.e.changedTouches[0].clientX;
+                y = opt.e.changedTouches[0].clientY;
+            } else {
+                x = opt.e.clientX;
+                y = opt.e.clientY;
+            }
+
+            if (x + 180 > window.innerWidth) x = window.innerWidth - 190;
+            if (y + 350 > window.innerHeight) y = window.innerHeight - 360;
+
+            contextMenu.style.left = x + 'px';
+            contextMenu.style.top = y + 'px';
+            contextMenu.style.display = 'block';
+            bgPanel.style.display = 'none';
+        }
+
+        function toggleBgPanel() {
+            const isVisible = bgPanel.style.display === 'block';
+            bgPanel.style.display = isVisible ? 'none' : 'block';
+        }
+
+        function changeBackgroundColor(color) {
+            canvas.setBackgroundImage(null, canvas.renderAll.bind(canvas));
+            canvas.setBackgroundColor(color, () => { canvas.renderAll(); triggerAutoSave(); });
+        }
+
+        function handleBgFile(files) {
+            if (!files || !files[0]) return;
+            const reader = new FileReader();
+            reader.onload = function(f) { applyPattern(f.target.result); };
+            reader.readAsDataURL(files[0]);
+            document.getElementById('bg-file-input').value = '';
+        }
+
+        function applyPattern(imgSrc) {
+            fabric.util.loadImage(imgSrc, function(img) {
+                if(!img) return;
+                const pattern = new fabric.Pattern({ source: img, repeat: 'repeat' });
+                canvas.setBackgroundColor(pattern, () => { canvas.renderAll(); triggerAutoSave(); });
+            });
+        }
+
+        function showModal() { confirmModal.style.display = 'block'; }
+        function closeModal() { confirmModal.style.display = 'none'; }
+        function executeClear() {
+            canvas.clear(); canvas.setBackgroundColor('#ffffff', canvas.renderAll.bind(canvas));
+            screenCount = 1; canvas.setWidth(SCREEN_WIDTH); drawGrid();
+            adjustZoom();
+            if(db) { const tx = db.transaction(STORE_NAME, "readwrite"); tx.objectStore(STORE_NAME).delete("last_session"); }
+            statusIndicator.innerText = "画布已重置"; statusIndicator.classList.add('visible');
+            closeModal();
+        }
+
+        function changeFont(fontFamily) {
+            const activeObj = canvas.getActiveObject();
+            if (activeObj && (activeObj.type === 'i-text' || activeObj.type === 'text')) {
+                activeObj.set("fontFamily", fontFamily);
+                activeObj.set("fontWeight", 600);
+                canvas.requestRenderAll();
+                triggerAutoSave();
+            }
+        }
+
+        function changeTextColor(color) {
+            const activeObj = canvas.getActiveObject();
+            if (activeObj && (activeObj.type === 'i-text' || activeObj.type === 'text')) {
+                activeObj.set("fill", color);
+                canvas.requestRenderAll();
+                triggerAutoSave();
+            }
+        }
+
+        function addText() {
+            if (isPanMode) togglePanMode();
+            const selectedFont = fontSelector.value;
+            const text = new fabric.IText('双击编辑', {
+                left: canvas.width / 2 - 60,
+                top: window.scrollY + 300, 
+                fontFamily: selectedFont, 
+                fontWeight: 600, 
+                fill: '#000000', 
+                fontSize: 40,
+                originX: 'left',
+                originY: 'top',
+                textAlign: 'left',
+                charSpacing: 0,
+                shadow: null,
+                objectCaching: false 
+            });
+            text.setControlsVisibility({ mt: false, mb: false, ml: false, mr: false });
+            canvas.add(text);
+            canvas.setActiveObject(text);
+            triggerAutoSave();
+        }
+
+        window.addEventListener('click', (e) => { 
+            if(!e.target.closest('#bg-panel') && !e.target.closest('button')) bgPanel.style.display = 'none'; 
+            if (!e.target.closest('#context-menu') && e.target.tagName !== 'CANVAS') {
+                contextMenu.style.display = 'none';
+            }
+        });
+
+        window.addEventListener('keydown', (e) => {
+            const activeObj = canvas.getActiveObject();
+            if (!activeObj) return;
+            if (activeObj.isEditing) return;
+
+            if ((e.ctrlKey || e.metaKey) && (e.key === 'd' || e.key === 'D')) {
+                e.preventDefault();
+                menuAction('duplicate');
+                return;
+            }
+
+            if (e.key === 'Delete' || e.key === 'Backspace') {
+                const activeObjects = canvas.getActiveObjects();
+                if (activeObjects.length) {
+                    canvas.discardActiveObject();
+                    activeObjects.forEach(obj => canvas.remove(obj));
+                    triggerAutoSave();
+                }
+                return;
+            }
+
+            const STEP = e.shiftKey ? 10 : 1;
+            switch(e.key) {
+                case 'ArrowUp': activeObj.top -= STEP; activeObj.setCoords(); canvas.requestRenderAll(); triggerAutoSave(); e.preventDefault(); break;
+                case 'ArrowDown': activeObj.top += STEP; activeObj.setCoords(); canvas.requestRenderAll(); triggerAutoSave(); e.preventDefault(); break;
+                case 'ArrowLeft': activeObj.left -= STEP; activeObj.setCoords(); canvas.requestRenderAll(); triggerAutoSave(); e.preventDefault(); break;
+                case 'ArrowRight': activeObj.left += STEP; activeObj.setCoords(); canvas.requestRenderAll(); triggerAutoSave(); e.preventDefault(); break;
+            }
+        });
+
+        const FONT_WEIGHTS = [300, 400, 600, 900];
+
+        function menuAction(action) {
+            const obj = canvas.getActiveObject(); if (!obj) return;
+            switch(action) {
+                case 'top': obj.bringToFront(); break; case 'bottom': obj.sendToBack(); break;
+                case 'up': obj.bringForward(); break; case 'down': obj.sendBackwards(); break;
+                case 'delete': canvas.remove(obj); canvas.discardActiveObject(); break;
+                case 'duplicate':
+                    obj.clone(function(cloned) {
+                        canvas.discardActiveObject();
+                        cloned.set({ left: obj.left + 20, top: obj.top + 20, evented: true });
+                        if(cloned.type === 'i-text' || cloned.type === 'text') cloned.set('objectCaching', false);
+                        if (cloned.type === 'activeSelection') {
+                            cloned.canvas = canvas;
+                            cloned.forEachObject(function(o) { canvas.add(o); });
+                            cloned.setCoords();
+                        } else { canvas.add(cloned); }
+                        canvas.setActiveObject(cloned);
+                        canvas.requestRenderAll();
+                        triggerAutoSave();
+                    });
+                    break;
+                case 'flipX': if(obj.type === 'image') obj.set('flipX', !obj.flipX); break;
+                case 'filter-bw': if (obj.type === 'image') { if (obj.filters && obj.filters.length > 0) { obj.filters = []; } else { obj.filters.push(new fabric.Image.filters.Grayscale()); } obj.applyFilters(); } break;
+                case 'shadow': if (obj.type === 'image') { if (obj.shadow) { obj.set('shadow', null); } else { obj.set('shadow', new fabric.Shadow({ color: 'rgba(0,0,0,0.5)', blur: 20, offsetX: 10, offsetY: 10 })); } } break;
+                case 'spacing-up': if (obj.type === 'i-text' || obj.type === 'text') { let val = obj.charSpacing || 0; obj.set('charSpacing', val + 50); } break;
+                case 'spacing-down': if (obj.type === 'i-text' || obj.type === 'text') { let val = obj.charSpacing || 0; obj.set('charSpacing', val - 50); } break;
+                case 'line-height-up': if (obj.type === 'i-text' || obj.type === 'text') { let val = obj.lineHeight || 1.16; obj.set('lineHeight', val + 0.1); } break;
+                case 'line-height-down': if (obj.type === 'i-text' || obj.type === 'text') { let val = obj.lineHeight || 1.16; if(val > 0.5) obj.set('lineHeight', val - 0.1); } break;
+                case 'align-left': if (obj.type === 'i-text' || obj.type === 'text') obj.set('textAlign', 'left'); break;
+                case 'align-center': if (obj.type === 'i-text' || obj.type === 'text') obj.set('textAlign', 'center'); break;
+                case 'align-right': if (obj.type === 'i-text' || obj.type === 'text') obj.set('textAlign', 'right'); break;
+                case 'weight-up': if (obj.type === 'i-text' || obj.type === 'text') { let current = parseInt(obj.fontWeight) || 600; if(current === 'normal') current = 400; if(current === 'bold') current = 700; let next = FONT_WEIGHTS.find(w => w > current); if (!next) next = FONT_WEIGHTS[FONT_WEIGHTS.length - 1]; obj.set('fontWeight', next); } break;
+                case 'weight-down': if (obj.type === 'i-text' || obj.type === 'text') { let current = parseInt(obj.fontWeight) || 600; if(current === 'normal') current = 400; if(current === 'bold') current = 700; let prev = [...FONT_WEIGHTS].reverse().find(w => w < current); if (!prev) prev = FONT_WEIGHTS[0]; obj.set('fontWeight', prev); } break;
+            }
+            bringGridToFront(); canvas.renderAll(); triggerAutoSave();
+            contextMenu.style.display = 'none';
+        }
+
+        function initDB() {
+            try {
+                const request = indexedDB.open(DB_NAME, 1);
+                request.onupgradeneeded = (e) => { db = e.target.result; if (!db.objectStoreNames.contains(STORE_NAME)) db.createObjectStore(STORE_NAME); };
+                request.onsuccess = (e) => { db = e.target.result; loadState(); };
+            } catch(e) { console.log("DB Error", e); }
+        }
+        function saveState() {
+            if (!db) return;
+            statusIndicator.innerText = "保存中..."; statusIndicator.classList.add('visible', 'status-saving');
+            const json = canvas.toJSON();
+            const tx = db.transaction(STORE_NAME, "readwrite");
+            tx.objectStore(STORE_NAME).put({ id: "autosave", canvas: json, screenCount: screenCount, updated: new Date().getTime() }, "last_session");
+            tx.oncomplete = () => { 
+                statusIndicator.innerText = "已自动保存"; statusIndicator.classList.remove('status-saving'); statusIndicator.classList.add('status-saved');
+                setTimeout(() => statusIndicator.classList.remove('visible'), 2000);
+            };
+        }
+        function loadState() {
+            const tx = db.transaction(STORE_NAME, "readonly");
+            tx.objectStore(STORE_NAME).get("last_session").onsuccess = (e) => {
+                const data = e.target.result;
+                if (data) {
+                    screenCount = data.screenCount || 1; canvas.setWidth(SCREEN_WIDTH * screenCount);
+                    canvas.loadFromJSON(data.canvas, () => {
+                        canvas.getObjects().forEach(obj => { 
+                            if(obj.type === 'image') {
+                                obj.setControlsVisibility({ mt: false, mb: false, ml: false, mr: false });
+                                obj.set('noScaleCache', false); 
+                            } else if (obj.type === 'i-text' || obj.type === 'text') {
+                                obj.setControlsVisibility({ mt: false, mb: false, ml: false, mr: false });
+                                obj.set('shadow', null);
+                                obj.set('objectCaching', false);
+                            }
+                        });
+                        drawGrid(); canvas.renderAll(); 
+                        adjustZoom();
+                        statusIndicator.innerText = "已恢复进度"; statusIndicator.classList.add('visible');
+                        setTimeout(() => statusIndicator.classList.remove('visible'), 2000);
+                    });
+                } else { drawGrid(); adjustZoom(); }
+            };
+        }
+        function triggerAutoSave() {
+            clearTimeout(saveTimeout);
+            statusIndicator.innerText = "修改中..."; statusIndicator.classList.add('visible'); statusIndicator.classList.remove('status-saved');
+            saveTimeout = setTimeout(saveState, 1000);
+        }
+        canvas.on('object:modified', triggerAutoSave); canvas.on('object:added', triggerAutoSave); canvas.on('object:removed', triggerAutoSave);
+        
+        function drawGrid() {
+            gridLines.forEach(l => canvas.remove(l)); gridLines = [];
+            for (let i = 1; i < screenCount; i++) {
+                const line = new fabric.Line([i * SCREEN_WIDTH, 0, i * SCREEN_WIDTH, SCREEN_HEIGHT], {
+                    stroke: '#007AFF', strokeWidth: 1, strokeDashArray: [3, 3], opacity: 0.5, selectable: false, evented: false, excludeFromExport: true
+                });
+                canvas.add(line); gridLines.push(line);
+            }
+            bringGridToFront();
+        }
+        function bringGridToFront() { gridLines.forEach(l => l.bringToFront()); }
+        function addScreen() { screenCount++; canvas.setWidth(SCREEN_WIDTH * screenCount); drawGrid(); canvas.renderAll(); triggerAutoSave(); adjustZoom(); }
+        function removeScreen() { if (screenCount > 1) { screenCount--; canvas.setWidth(SCREEN_WIDTH * screenCount); drawGrid(); canvas.renderAll(); triggerAutoSave(); adjustZoom(); } }
+        function handleFiles(files) {
+            if (!files) return;
+            Array.from(files).forEach(file => {
+                const reader = new FileReader();
+                reader.onload = (f) => {
+                    fabric.Image.fromURL(f.target.result, (img) => {
+                        if (img.width > SCREEN_WIDTH) img.scaleToWidth(SCREEN_WIDTH * 0.8);
+                        img.set({ left: (canvas.width - img.getScaledWidth()) / 2 + (Math.random() * 40 - 20), top: (canvas.height - img.getScaledHeight()) / 2 + (Math.random() * 40 - 20) });
+                        img.setControlsVisibility({ mt: false, mb: false, ml: false, mr: false });
+                        canvas.add(img); canvas.setActiveObject(img); bringGridToFront(); triggerAutoSave();
+                    });
+                };
+                reader.readAsDataURL(file);
+            });
+            document.getElementById('file-input').value = '';
+        }
+
+        function exportSlicesZip() {
+            if (typeof JSZip === 'undefined') { alert("ZIP 库未加载，请检查网络或刷新重试。"); return; }
+            statusIndicator.innerText = "正在打包..."; statusIndicator.classList.add('visible', 'status-saving');
+            try {
+                const zip = new JSZip();
+                gridLines.forEach(l => l.visible = false);
+                canvas.renderAll();
+                for (let i = 0; i < screenCount; i++) {
+                    const dataURL = canvas.toDataURL({ format: 'png', quality: 1, multiplier: 2, left: i * SCREEN_WIDTH, top: 0, width: SCREEN_WIDTH, height: SCREEN_HEIGHT });
+                    const imgData = dataURL.split(',')[1];
+                    zip.file(`spark_slice_${i + 1}.png`, imgData, {base64: true});
+                }
+                gridLines.forEach(l => l.visible = true); canvas.renderAll();
+                zip.generateAsync({type:"blob"}).then(function(content) {
+                    const a = document.createElement('a'); a.href = URL.createObjectURL(content); a.download = "spark_slices.zip"; document.body.appendChild(a); a.click(); document.body.removeChild(a);
+                    statusIndicator.innerText = "打包完成"; statusIndicator.classList.remove('status-saving'); statusIndicator.classList.add('status-saved'); setTimeout(() => statusIndicator.classList.remove('visible'), 2000);
+                });
+            } catch (e) {
+                console.error(e); alert("导出失败：请确保背景使用的是纯色或通过'+'按钮上传的图片。");
+                statusIndicator.innerText = "导出失败"; statusIndicator.classList.remove('status-saving');
+            }
+        }
+        
+        initDB();
+    </script>
+</body>
+</html>
