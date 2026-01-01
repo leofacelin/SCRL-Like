@@ -3,9 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Spark Canvas - V64 (智能导出版)</title>
+    <title>Spark Canvas - V76 (对齐修正版)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -78,6 +77,7 @@
             opacity: 0; width: 100%; height: 100%; cursor: pointer; 
             position: absolute; top:0; left:0; -webkit-appearance: none;
         }
+        select.font-select option.upload-option { color: var(--accent-color); font-weight: bold; }
 
         #bg-panel { display: none; position: absolute; bottom: 90px; left: 50%; transform: translateX(-50%); background: rgba(30, 30, 30, 0.95); backdrop-filter: blur(20px); border: 1px solid #444; border-radius: 16px; padding: 15px; box-shadow: 0 10px 40px rgba(0,0,0,0.8); z-index: 90; animation: panelUp 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275); width: 220px; padding-bottom: env(safe-area-inset-bottom, 15px); }
         @keyframes panelUp { from { opacity: 0; transform: translate(-50%, 20px); } to { opacity: 1; transform: translate(-50%, 0); } }
@@ -240,7 +240,6 @@
         let screenCount = 1;
         fabric.textureSize = 2048; 
 
-        // 旋转图标
         const rotateIconImg = new Image();
         rotateIconImg.src = 'rotate.png';
         rotateIconImg.onload = function() { if(canvas) canvas.requestRenderAll(); }
@@ -293,10 +292,12 @@
         const DB_NAME = "SparkCanvasDB"; const STORE_NAME = "sessions";
         let db; let saveTimeout;
 
+        let isInternalUpdate = false;
         let currentBgFill = '#ffffff'; 
         let bgRect; 
 
         function updateWorkspace() {
+            isInternalUpdate = true;
             if (bgRect) canvas.remove(bgRect);
             
             bgRect = new fabric.Rect({
@@ -325,6 +326,7 @@
                 });
                 canvas.add(line); gridLines.push(line);
             }
+            isInternalUpdate = false;
         }
 
         function initViewport() {
@@ -370,8 +372,6 @@
             initViewport();
         }, 100);
 
-        // --- 交互逻辑 ---
-        
         let isDraggingCanvas = false;
         let lastX, lastY;
 
@@ -413,11 +413,7 @@
             
             if (target && target !== bgRect && evt.type === 'touchstart') {
                 isDraggingCanvas = false;
-                
-                if (target.__corner) {
-                    return; 
-                }
-
+                if (target.__corner) return; 
                 longPressTimer = setTimeout(() => {
                     if (!canvas.isDrawingMode && !isDraggingCanvas && !canvas.getActiveObject().isMoving) {
                         openContextMenu(opt);
@@ -431,14 +427,10 @@
             if (isDraggingCanvas) {
                 const evt = opt.e;
                 const pos = getClientPos(evt);
-                
                 if (pos.x === undefined || pos.y === undefined) return;
-
                 const deltaX = pos.x - lastX;
                 const deltaY = pos.y - lastY;
-                
                 canvas.relativePan({ x: deltaX, y: deltaY });
-                
                 lastX = pos.x;
                 lastY = pos.y;
             } else {
@@ -481,13 +473,10 @@
                 isDraggingCanvas = false; 
                 const pointer0 = canvas.getPointer(e.touches[0]); 
                 let target = canvas.findTarget(e); 
-                
                 if (target === bgRect) target = null;
-
                 const dx = e.touches[0].clientX - e.touches[1].clientX;
                 const dy = e.touches[0].clientY - e.touches[1].clientY;
                 initialDistance = Math.sqrt(dx * dx + dy * dy);
-
                 if (target && target === canvas.getActiveObject()) {
                     pinchMode = 'object';
                     initialObjectScale = target.scaleX;
@@ -505,17 +494,14 @@
                 const dx = e.touches[0].clientX - e.touches[1].clientX;
                 const dy = e.touches[0].clientY - e.touches[1].clientY;
                 const currentDistance = Math.sqrt(dx * dx + dy * dy);
-                
                 if (pinchMode === 'canvas') {
                     const scale = currentDistance / initialDistance;
                     let newZoom = initialZoom * scale;
                     if (newZoom > 5) newZoom = 5;
                     if (newZoom < 0.1) newZoom = 0.1;
-                    
                     const cx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
                     const cy = (e.touches[0].clientY + e.touches[1].clientY) / 2;
                     canvas.zoomToPoint({ x: cx, y: cy }, newZoom);
-                    
                 } else if (pinchMode === 'object') {
                     const target = canvas.getActiveObject();
                     if(target) {
@@ -538,10 +524,51 @@
             }
         });
 
-        // --- 通用逻辑 ---
+        // --- 功能函数 ---
 
         let longPressTimer;
+        const FONT_WEIGHTS = [300, 400, 600, 900];
 
+        function menuAction(action) {
+            const obj = canvas.getActiveObject(); if (!obj) return;
+            switch(action) {
+                case 'top': obj.bringToFront(); break; case 'bottom': obj.sendToBack(); break;
+                case 'up': obj.bringForward(); break; case 'down': obj.sendBackwards(); break;
+                case 'delete': canvas.remove(obj); canvas.discardActiveObject(); break;
+                case 'duplicate':
+                    obj.clone(function(cloned) {
+                        canvas.discardActiveObject();
+                        cloned.set({ left: obj.left + 20, top: obj.top + 20, evented: true });
+                        if(cloned.type === 'i-text' || cloned.type === 'text') cloned.set('objectCaching', false);
+                        if (cloned.type === 'activeSelection') {
+                            cloned.canvas = canvas;
+                            cloned.forEachObject(function(o) { canvas.add(o); });
+                            cloned.setCoords();
+                        } else { canvas.add(cloned); }
+                        canvas.setActiveObject(cloned);
+                        canvas.requestRenderAll();
+                        triggerAutoSave();
+                    });
+                    break;
+                case 'flipX': if(obj.type === 'image') obj.set('flipX', !obj.flipX); break;
+                case 'filter-bw': if (obj.type === 'image') { if (obj.filters && obj.filters.length > 0) { obj.filters = []; } else { obj.filters.push(new fabric.Image.filters.Grayscale()); } obj.applyFilters(); } break;
+                case 'shadow': if (obj.type === 'image') { if (obj.shadow) { obj.set('shadow', null); } else { obj.set('shadow', new fabric.Shadow({ color: 'rgba(0,0,0,0.5)', blur: 20, offsetX: 10, offsetY: 10 })); } } break;
+                case 'spacing-up': if (obj.type === 'i-text' || obj.type === 'text') { let val = obj.charSpacing || 0; obj.set('charSpacing', val + 50); } break;
+                case 'spacing-down': if (obj.type === 'i-text' || obj.type === 'text') { let val = obj.charSpacing || 0; obj.set('charSpacing', val - 50); } break;
+                case 'line-height-up': if (obj.type === 'i-text' || obj.type === 'text') { let val = obj.lineHeight || 1.16; obj.set('lineHeight', val + 0.1); } break;
+                case 'line-height-down': if (obj.type === 'i-text' || obj.type === 'text') { let val = obj.lineHeight || 1.16; if(val > 0.5) obj.set('lineHeight', val - 0.1); } break;
+                case 'align-left': if (obj.type === 'i-text' || obj.type === 'text') obj.set('textAlign', 'left'); break;
+                case 'align-center': if (obj.type === 'i-text' || obj.type === 'text') obj.set('textAlign', 'center'); break;
+                case 'align-right': if (obj.type === 'i-text' || obj.type === 'text') obj.set('textAlign', 'right'); break;
+                case 'weight-up': if (obj.type === 'i-text' || obj.type === 'text') { let current = parseInt(obj.fontWeight) || 600; if(current === 'normal') current = 400; if(current === 'bold') current = 700; let next = FONT_WEIGHTS.find(w => w > current); if (!next) next = FONT_WEIGHTS[FONT_WEIGHTS.length - 1]; obj.set('fontWeight', next); } break;
+                case 'weight-down': if (obj.type === 'i-text' || obj.type === 'text') { let current = parseInt(obj.fontWeight) || 600; if(current === 'normal') current = 400; if(current === 'bold') current = 700; let prev = [...FONT_WEIGHTS].reverse().find(w => w < current); if (!prev) prev = FONT_WEIGHTS[0]; obj.set('fontWeight', prev); } break;
+            }
+            if(bgRect) canvas.sendToBack(bgRect);
+            bringGridToFront(); canvas.renderAll(); triggerAutoSave();
+            contextMenu.style.display = 'none';
+        }
+
+        // V75: Menu positioning logic
         function openContextMenu(opt) {
             const target = opt.target || canvas.getActiveObject();
             if(!target || target === bgRect) return;
@@ -562,21 +589,28 @@
                 textItems.forEach(el => el.style.display = 'none');
             }
 
-            let x, y;
+            let clientX, clientY;
             if (opt.e.changedTouches && opt.e.changedTouches[0]) {
-                x = opt.e.changedTouches[0].clientX;
-                y = opt.e.changedTouches[0].clientY;
+                clientX = opt.e.changedTouches[0].clientX;
+                clientY = opt.e.changedTouches[0].clientY;
             } else {
-                x = opt.e.clientX;
-                y = opt.e.clientY;
+                clientX = opt.e.clientX;
+                clientY = opt.e.clientY;
             }
 
-            if (x + 130 > window.innerWidth) x = window.innerWidth - 140;
-            if (y + 300 > window.innerHeight) y = window.innerHeight - 310;
-
-            contextMenu.style.left = x + 'px';
-            contextMenu.style.top = y + 'px';
             contextMenu.style.display = 'block';
+            const menuW = contextMenu.offsetWidth;
+            const menuH = contextMenu.offsetHeight;
+
+            let left = clientX + 10;
+            let top = clientY - (menuH / 2);
+
+            if (left + menuW > window.innerWidth) left = clientX - menuW - 10;
+            if (top + menuH > window.innerHeight) top = window.innerHeight - menuH - 10;
+            if (top < 10) top = 10;
+
+            contextMenu.style.left = left + 'px';
+            contextMenu.style.top = top + 'px';
             bgPanel.style.display = 'none';
         }
 
@@ -592,6 +626,26 @@
                 canvas.requestRenderAll();
                 triggerAutoSave();
             }
+        }
+
+        function handleFiles(files) {
+            if (!files || !files[0]) return;
+            const center = canvas.getVpCenter();
+            Array.from(files).forEach(file => {
+                const reader = new FileReader();
+                reader.onload = (f) => {
+                    fabric.Image.fromURL(f.target.result, (img) => {
+                        if (img.width > SCREEN_WIDTH) img.scaleToWidth(SCREEN_WIDTH * 0.8);
+                        const offsetX = (Math.random() * 40 - 20);
+                        const offsetY = (Math.random() * 40 - 20);
+                        img.set({ left: center.x - (img.getScaledWidth()/2) + offsetX, top: center.y - (img.getScaledHeight()/2) + offsetY });
+                        img.setControlsVisibility({ mt: false, mb: false, ml: false, mr: false });
+                        canvas.add(img); canvas.setActiveObject(img); bringGridToFront(); triggerAutoSave();
+                    });
+                };
+                reader.readAsDataURL(file);
+            });
+            document.getElementById('file-input').value = '';
         }
 
         function handleBgFile(files) {
@@ -652,14 +706,13 @@
             const center = canvas.getVpCenter();
             const selectedFont = fontSelector.value;
             const text = new fabric.IText('双击编辑', {
-                left: center.x,
-                top: center.y, 
+                left: center.x, top: center.y,
                 fontFamily: selectedFont, 
                 fontWeight: 600, 
                 fill: '#000000', 
                 fontSize: 40,
-                originX: 'left',
-                originY: 'top',
+                originX: 'center', 
+                originY: 'center',
                 textAlign: 'left',
                 charSpacing: 0,
                 shadow: null,
@@ -671,83 +724,81 @@
             triggerAutoSave();
         }
 
-        window.addEventListener('click', (e) => { 
-            if(!e.target.closest('#bg-panel') && !e.target.closest('button')) bgPanel.style.display = 'none'; 
-            if (!e.target.closest('#context-menu') && e.target.tagName !== 'CANVAS') {
-                contextMenu.style.display = 'none';
-            }
-        });
+        function addScreen() { 
+            screenCount++; 
+            updateWorkspace(); 
+            canvas.requestRenderAll(); 
+            triggerAutoSave(); 
+        }
+        function removeScreen() { 
+            if (screenCount > 1) { 
+                screenCount--; 
+                updateWorkspace(); 
+                canvas.requestRenderAll(); 
+                triggerAutoSave(); 
+            } 
+        }
 
-        window.addEventListener('keydown', (e) => {
-            const activeObj = canvas.getActiveObject();
-            if (!activeObj) return;
-            if (activeObj.isEditing) return;
-
-            if ((e.ctrlKey || e.metaKey) && (e.key === 'd' || e.key === 'D')) {
-                e.preventDefault();
-                menuAction('duplicate');
-                return;
-            }
-
-            if (e.key === 'Delete' || e.key === 'Backspace') {
-                const activeObjects = canvas.getActiveObjects();
-                if (activeObjects.length) {
-                    canvas.discardActiveObject();
-                    activeObjects.forEach(obj => canvas.remove(obj));
-                    triggerAutoSave();
-                }
-                return;
-            }
-
-            const STEP = e.shiftKey ? 10 : 1;
-            switch(e.key) {
-                case 'ArrowUp': activeObj.top -= STEP; activeObj.setCoords(); canvas.requestRenderAll(); triggerAutoSave(); e.preventDefault(); break;
-                case 'ArrowDown': activeObj.top += STEP; activeObj.setCoords(); canvas.requestRenderAll(); triggerAutoSave(); e.preventDefault(); break;
-                case 'ArrowLeft': activeObj.left -= STEP; activeObj.setCoords(); canvas.requestRenderAll(); triggerAutoSave(); e.preventDefault(); break;
-                case 'ArrowRight': activeObj.left += STEP; activeObj.setCoords(); canvas.requestRenderAll(); triggerAutoSave(); e.preventDefault(); break;
-            }
-        });
-
-        const FONT_WEIGHTS = [300, 400, 600, 900];
-
-        function menuAction(action) {
-            const obj = canvas.getActiveObject(); if (!obj) return;
-            switch(action) {
-                case 'top': obj.bringToFront(); break; case 'bottom': obj.sendToBack(); break;
-                case 'up': obj.bringForward(); break; case 'down': obj.sendBackwards(); break;
-                case 'delete': canvas.remove(obj); canvas.discardActiveObject(); break;
-                case 'duplicate':
-                    obj.clone(function(cloned) {
-                        canvas.discardActiveObject();
-                        cloned.set({ left: obj.left + 20, top: obj.top + 20, evented: true });
-                        if(cloned.type === 'i-text' || cloned.type === 'text') cloned.set('objectCaching', false);
-                        if (cloned.type === 'activeSelection') {
-                            cloned.canvas = canvas;
-                            cloned.forEachObject(function(o) { canvas.add(o); });
-                            cloned.setCoords();
-                        } else { canvas.add(cloned); }
-                        canvas.setActiveObject(cloned);
-                        canvas.requestRenderAll();
-                        triggerAutoSave();
-                    });
-                    break;
-                case 'flipX': if(obj.type === 'image') obj.set('flipX', !obj.flipX); break;
-                case 'filter-bw': if (obj.type === 'image') { if (obj.filters && obj.filters.length > 0) { obj.filters = []; } else { obj.filters.push(new fabric.Image.filters.Grayscale()); } obj.applyFilters(); } break;
-                case 'shadow': if (obj.type === 'image') { if (obj.shadow) { obj.set('shadow', null); } else { obj.set('shadow', new fabric.Shadow({ color: 'rgba(0,0,0,0.5)', blur: 20, offsetX: 10, offsetY: 10 })); } } break;
-                case 'spacing-up': if (obj.type === 'i-text' || obj.type === 'text') { let val = obj.charSpacing || 0; obj.set('charSpacing', val + 50); } break;
-                case 'spacing-down': if (obj.type === 'i-text' || obj.type === 'text') { let val = obj.charSpacing || 0; obj.set('charSpacing', val - 50); } break;
-                case 'line-height-up': if (obj.type === 'i-text' || obj.type === 'text') { let val = obj.lineHeight || 1.16; obj.set('lineHeight', val + 0.1); } break;
-                case 'line-height-down': if (obj.type === 'i-text' || obj.type === 'text') { let val = obj.lineHeight || 1.16; if(val > 0.5) obj.set('lineHeight', val - 0.1); } break;
-                case 'align-left': if (obj.type === 'i-text' || obj.type === 'text') obj.set('textAlign', 'left'); break;
-                case 'align-center': if (obj.type === 'i-text' || obj.type === 'text') obj.set('textAlign', 'center'); break;
-                case 'align-right': if (obj.type === 'i-text' || obj.type === 'text') obj.set('textAlign', 'right'); break;
-                case 'weight-up': if (obj.type === 'i-text' || obj.type === 'text') { let current = parseInt(obj.fontWeight) || 600; if(current === 'normal') current = 400; if(current === 'bold') current = 700; let next = FONT_WEIGHTS.find(w => w > current); if (!next) next = FONT_WEIGHTS[FONT_WEIGHTS.length - 1]; obj.set('fontWeight', next); } break;
-                case 'weight-down': if (obj.type === 'i-text' || obj.type === 'text') { let current = parseInt(obj.fontWeight) || 600; if(current === 'normal') current = 400; if(current === 'bold') current = 700; let prev = [...FONT_WEIGHTS].reverse().find(w => w < current); if (!prev) prev = FONT_WEIGHTS[0]; obj.set('fontWeight', prev); } break;
-            }
-            if(bgRect) canvas.sendToBack(bgRect);
+        // V76: 修正后的对齐吸附算法
+        let ctxLines = [];
+        canvas.on('object:moving', function(e) {
+            const obj = e.target;
+            const threshold = 10; 
+            ctxLines.forEach(line => canvas.remove(line)); ctxLines = [];
             
-            bringGridToFront(); canvas.renderAll(); triggerAutoSave();
-            contextMenu.style.display = 'none';
+            // 核心修复：获取物体绝对几何中心
+            const objCenter = obj.getCenterPoint();
+            const objCenterX = objCenter.x;
+            const objCenterY = objCenter.y;
+            
+            const pageIndex = Math.floor((obj.left + obj.width * obj.scaleX / 2) / SCREEN_WIDTH);
+            const screenCenterX = pageIndex * SCREEN_WIDTH + SCREEN_WIDTH / 2;
+            const screenCenterY = SCREEN_HEIGHT / 2;
+
+            let snappedX = false, snappedY = false;
+
+            // X轴：吸附到屏幕中心
+            if (Math.abs(objCenterX - screenCenterX) < threshold) {
+                // 核心修复：使用 setPositionByOrigin 移动中心点
+                obj.setPositionByOrigin(new fabric.Point(screenCenterX, objCenterY), 'center', 'center');
+                drawGuideline(screenCenterX, 0, screenCenterX, SCREEN_HEIGHT);
+                snappedX = true;
+            }
+            // Y轴：吸附到屏幕中心
+            if (Math.abs(objCenterY - screenCenterY) < threshold) {
+                obj.setPositionByOrigin(new fabric.Point(objCenterX, screenCenterY), 'center', 'center');
+                drawGuideline(pageIndex * SCREEN_WIDTH, screenCenterY, (pageIndex + 1) * SCREEN_WIDTH, screenCenterY);
+                snappedY = true;
+            }
+
+            // 物体间吸附
+            if (!snappedX || !snappedY) {
+                canvas.getObjects().forEach(target => {
+                    if (target === obj || target === bgRect || target.excludeFromExport) return;
+                    
+                    const tCenter = target.getCenterPoint();
+                    const tCX = tCenter.x;
+                    const tCY = tCenter.y;
+
+                    // X
+                    if (!snappedX && Math.abs(objCenterX - tCX) < threshold) {
+                        obj.setPositionByOrigin(new fabric.Point(tCX, objCenterY), 'center', 'center');
+                        drawGuideline(tCX, Math.min(obj.top, target.top)-50, tCX, Math.max(obj.top+obj.height*obj.scaleY, target.top+target.height*target.scaleY)+50);
+                        snappedX = true;
+                    }
+                    // Y
+                    if (!snappedY && Math.abs(objCenterY - tCY) < threshold) {
+                        obj.setPositionByOrigin(new fabric.Point(objCenterX, tCY), 'center', 'center');
+                        drawGuideline(Math.min(obj.left, target.left)-50, tCY, Math.max(obj.left+obj.width*obj.scaleX, target.left+target.width*target.scaleX)+50, tCY);
+                        snappedY = true;
+                    }
+                });
+            }
+        });
+        canvas.on('mouse:up', function() { ctxLines.forEach(line => canvas.remove(line)); ctxLines = []; });
+        function drawGuideline(x1, y1, x2, y2) {
+            const line = new fabric.Line([x1, y1, x2, y2], { stroke: '#ff0077', strokeWidth: 1, strokeDashArray: [4, 4], selectable: false, evented: false, excludeFromExport: true });
+            canvas.add(line); ctxLines.push(line);
         }
 
         function initDB() {
@@ -758,10 +809,10 @@
             } catch(e) { console.log("DB Error", e); }
         }
         function saveState() {
-            if (!db) return;
+            if (!db || isInternalUpdate) return;
             statusIndicator.innerText = "保存中..."; statusIndicator.classList.add('visible', 'status-saving');
+            
             canvas.clipPath = null;
-            if(bgRect) canvas.remove(bgRect);
             const json = canvas.toJSON();
             updateWorkspace(); 
             const saveData = { id: "autosave", canvas: json, screenCount: screenCount, bgFill: currentBgFill, updated: new Date().getTime() };
@@ -781,10 +832,11 @@
                     screenCount = data.screenCount || 1; 
                     canvas.loadFromJSON(data.canvas, () => {
                         if (data.bgFill) currentBgFill = data.bgFill;
-                        else canvas.getObjects().forEach(obj => { if (obj.isBackground) currentBgFill = obj.fill; });
-                        
+                        else {
+                            const loadedBg = canvas.getObjects().find(o => o.isBackground);
+                            if (loadedBg) { currentBgFill = loadedBg.fill; canvas.remove(loadedBg); }
+                        }
                         updateWorkspace(); 
-                        
                         canvas.getObjects().forEach(obj => { 
                             if(obj === bgRect) return;
                             if(obj.type === 'image') {
@@ -805,6 +857,7 @@
             };
         }
         function triggerAutoSave() {
+            if(isInternalUpdate) return;
             clearTimeout(saveTimeout);
             statusIndicator.innerText = "修改中..."; statusIndicator.classList.add('visible'); statusIndicator.classList.remove('status-saved');
             saveTimeout = setTimeout(saveState, 1000);
@@ -822,112 +875,51 @@
             bringGridToFront();
         }
         function bringGridToFront() { gridLines.forEach(l => l.bringToFront()); }
-        
-        function addScreen() { screenCount++; updateWorkspace(); canvas.renderAll(); triggerAutoSave(); }
-        function removeScreen() { if (screenCount > 1) { screenCount--; updateWorkspace(); canvas.renderAll(); triggerAutoSave(); } }
-        
-        function handleFiles(files) {
-            if (!files) return;
-            const center = canvas.getVpCenter();
-            // 修正坐标转换
-            const zoom = canvas.getZoom();
-            const vpt = canvas.viewportTransform;
-            const cx = (canvas.width / 2 - vpt[4]) / zoom;
-            const cy = (canvas.height / 2 - vpt[5]) / zoom;
 
-            Array.from(files).forEach(file => {
-                const reader = new FileReader();
-                reader.onload = (f) => {
-                    fabric.Image.fromURL(f.target.result, (img) => {
-                        if (img.width > SCREEN_WIDTH) img.scaleToWidth(SCREEN_WIDTH * 0.8);
-                        img.set({ 
-                            left: cx - (img.getScaledWidth()/2) + (Math.random() * 40 - 20), 
-                            top: cy - (img.getScaledHeight()/2) + (Math.random() * 40 - 20)
-                        });
-                        img.setControlsVisibility({ mt: false, mb: false, ml: false, mr: false });
-                        canvas.add(img); canvas.setActiveObject(img); bringGridToFront(); triggerAutoSave();
-                    });
-                };
-                reader.readAsDataURL(file);
-            });
-            document.getElementById('file-input').value = '';
-        }
-
-        // V64: 智能导出核心
         async function exportContent() {
             statusIndicator.innerText = "准备导出..."; statusIndicator.classList.add('visible', 'status-saving');
-            
-            // 保存状态
             const originalVpt = canvas.viewportTransform.slice();
             const originalWidth = canvas.width;
             const originalHeight = canvas.height;
-
-            // 归位
             canvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
             canvas.setWidth(screenCount * SCREEN_WIDTH);
             canvas.setHeight(SCREEN_HEIGHT);
             gridLines.forEach(l => l.visible = false);
-            canvas.clipPath = null;
-            canvas.renderAll();
+            canvas.clipPath = null; canvas.renderAll();
 
-            // 生成 blobs
             const blobs = [];
             for (let i = 0; i < screenCount; i++) {
-                const dataURL = canvas.toDataURL({ 
-                    format: 'png', quality: 1, multiplier: 2, 
-                    left: i * SCREEN_WIDTH, top: 0, width: SCREEN_WIDTH, height: SCREEN_HEIGHT 
-                });
+                const dataURL = canvas.toDataURL({ format: 'png', quality: 1, multiplier: 2, left: i * SCREEN_WIDTH, top: 0, width: SCREEN_WIDTH, height: SCREEN_HEIGHT });
                 const blob = await (await fetch(dataURL)).blob();
                 blobs.push(blob);
             }
 
-            // 尝试调用原生分享 (Web Share API)
-            // 需要检测: 1. 支持 navigator.share 2. 支持 files 参数
             let shareSuccess = false;
             try {
                 if (navigator.share && navigator.canShare) {
                     const files = blobs.map((blob, i) => new File([blob], `spark_slice_${i+1}.png`, { type: 'image/png' }));
                     if (navigator.canShare({ files })) {
                         statusIndicator.innerText = "调起分享...";
-                        await navigator.share({
-                            files: files,
-                            title: 'Spark Canvas 导出',
-                            text: '由 Spark Canvas 生成'
-                        });
+                        await navigator.share({ files: files, title: 'Spark Canvas', text: '由 Spark Canvas 生成' });
                         shareSuccess = true;
-                        statusIndicator.innerText = "已完成"; 
-                        statusIndicator.classList.remove('status-saving'); statusIndicator.classList.add('status-saved');
+                        statusIndicator.innerText = "已完成"; statusIndicator.classList.remove('status-saving'); statusIndicator.classList.add('status-saved');
                     }
                 }
-            } catch (err) {
-                console.log("Share failed or cancelled", err);
-                // Share 失败不一定意味着出错，用户取消也算，所以这里不一定报错，可以继续降级
-            }
+            } catch (err) { console.log("Share skipped", err); }
 
-            // 如果没有分享成功（不支持或用户取消/失败），则降级为 ZIP
             if (!shareSuccess) {
-                statusIndicator.innerText = "正在打包ZIP...";
-                try {
-                    const zip = new JSZip();
-                    blobs.forEach((blob, i) => {
-                        zip.file(`spark_slice_${i + 1}.png`, blob);
-                    });
-                    const content = await zip.generateAsync({type:"blob"});
-                    const a = document.createElement('a'); a.href = URL.createObjectURL(content); a.download = "spark_slices.zip"; document.body.appendChild(a); a.click(); document.body.removeChild(a);
-                    statusIndicator.innerText = "ZIP已下载"; statusIndicator.classList.remove('status-saving'); statusIndicator.classList.add('status-saved');
-                } catch (e) {
-                    statusIndicator.innerText = "导出失败";
+                statusIndicator.innerText = "开始下载...";
+                for (let i = 0; i < blobs.length; i++) {
+                    statusIndicator.innerText = `下载中 ${i+1}/${blobs.length}`;
+                    const a = document.createElement('a'); a.href = URL.createObjectURL(blobs[i]); a.download = `spark_slice_${i + 1}.png`;
+                    document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(a.href);
+                    if (i < blobs.length - 1) await new Promise(r => setTimeout(r, 1500));
                 }
+                statusIndicator.innerText = "下载完成"; statusIndicator.classList.remove('status-saving'); statusIndicator.classList.add('status-saved');
             }
-
-            // 恢复现场
             setTimeout(() => statusIndicator.classList.remove('visible'), 2000);
-            canvas.setViewportTransform(originalVpt);
-            canvas.setWidth(originalWidth);
-            canvas.setHeight(originalHeight);
-            gridLines.forEach(l => l.visible = true);
-            updateWorkspace();
-            canvas.requestRenderAll();
+            canvas.setViewportTransform(originalVpt); canvas.setWidth(originalWidth); canvas.setHeight(originalHeight);
+            gridLines.forEach(l => l.visible = true); updateWorkspace(); canvas.requestRenderAll();
         }
         
         initDB();
