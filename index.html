@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Spark Canvas - V63 (视口适配修复版)</title>
+    <title>Spark Canvas - V64 (智能导出版)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     
@@ -14,11 +14,9 @@
     <style>
         :root { --bg-color: #1e1e1e; --panel-bg: rgba(45, 45, 45, 0.95); --accent-color: #007AFF; --danger-color: #ff453a; --text-color: #fff; --border-color: #444; }
         
-        /* V63: 核心修复 - 强制锁定 Body，防止浏览器自身的滚动/回弹干扰 */
         html, body { 
             height: 100%; width: 100%; 
-            position: fixed; /* 钉死在屏幕上 */
-            top: 0; left: 0; right: 0; bottom: 0;
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
             overflow: hidden; 
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
             background-color: #121212; 
@@ -31,11 +29,8 @@
         #status-indicator.visible { opacity: 1; }
         .status-saved { color: #32D74B !important; } .status-saving { color: #FFD700 !important; }
 
-        /* V63: 核心修复 - 使用 dvh 单位，适应移动端动态地址栏 */
         #canvas-wrapper { 
-            width: 100vw; 
-            height: 100vh; /* 兼容旧浏览器 */
-            height: 100dvh; /* 核心：动态视口高度 */
+            width: 100vw; height: 100dvh; 
             overflow: hidden;
             background-color: #121212; 
             background-image: radial-gradient(#333 1px, transparent 1px);
@@ -55,7 +50,6 @@
             box-shadow: 0 10px 40px rgba(0,0,0,0.5); backdrop-filter: blur(20px); 
             z-index: 100; border: 1px solid rgba(255,255,255,0.15); 
             box-sizing: border-box;
-            /* 防止刘海屏遮挡底部 */
             padding-bottom: env(safe-area-inset-bottom, 8px); 
             margin-bottom: env(safe-area-inset-bottom, 0); 
         }
@@ -233,7 +227,7 @@
         <div class="tool-group">
             <button onclick="toggleBgPanel()" title="背景设置">▧</button>
             <button class="danger" onclick="showModal()" title="清空">🗑</button>
-            <button class="primary" onclick="exportSlicesZip()" title="导出">➜</button>
+            <button class="primary" onclick="exportContent()" title="导出">➜</button>
         </div>
     </div>
     
@@ -340,8 +334,6 @@
             canvas.setHeight(winH);
             
             let zoom;
-
-            // 移动端逻辑 (宽度 < 600)
             if (winW < 600) {
                 const targetHeight = winH * 0.8;
                 zoom = targetHeight / SCREEN_HEIGHT;
@@ -357,8 +349,6 @@
             canvas.setZoom(zoom);
 
             const vpt = canvas.viewportTransform;
-            
-            // 核心：居中显示第一屏
             vpt[4] = (winW / 2) - ((SCREEN_WIDTH / 2) * zoom);
             vpt[5] = (winH - SCREEN_HEIGHT * zoom) / 2;
             
@@ -480,7 +470,6 @@
             opt.e.stopPropagation();
         });
 
-        // Pinch Zoom
         let initialDistance = 0;
         let initialZoom = 1;
         let initialObjectScale = 1;
@@ -490,7 +479,6 @@
         canvas.upperCanvasEl.addEventListener('touchstart', function(e) {
             if (e.touches.length === 2) {
                 isDraggingCanvas = false; 
-                
                 const pointer0 = canvas.getPointer(e.touches[0]); 
                 let target = canvas.findTarget(e); 
                 
@@ -865,49 +853,81 @@
             document.getElementById('file-input').value = '';
         }
 
-        function exportSlicesZip() {
-            if (typeof JSZip === 'undefined') { alert("ZIP 库未加载，请检查网络或刷新重试。"); return; }
-            statusIndicator.innerText = "正在打包..."; statusIndicator.classList.add('visible', 'status-saving');
+        // V64: 智能导出核心
+        async function exportContent() {
+            statusIndicator.innerText = "准备导出..."; statusIndicator.classList.add('visible', 'status-saving');
             
+            // 保存状态
             const originalVpt = canvas.viewportTransform.slice();
             const originalWidth = canvas.width;
             const originalHeight = canvas.height;
 
+            // 归位
             canvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
             canvas.setWidth(screenCount * SCREEN_WIDTH);
             canvas.setHeight(SCREEN_HEIGHT);
-            
             gridLines.forEach(l => l.visible = false);
             canvas.clipPath = null;
-            
             canvas.renderAll();
 
-            try {
-                const zip = new JSZip();
-                for (let i = 0; i < screenCount; i++) {
-                    const dataURL = canvas.toDataURL({ 
-                        format: 'png', quality: 1, multiplier: 2, 
-                        left: i * SCREEN_WIDTH, top: 0, width: SCREEN_WIDTH, height: SCREEN_HEIGHT 
-                    });
-                    const imgData = dataURL.split(',')[1];
-                    zip.file(`spark_slice_${i + 1}.png`, imgData, {base64: true});
-                }
-                
-                zip.generateAsync({type:"blob"}).then(function(content) {
-                    const a = document.createElement('a'); a.href = URL.createObjectURL(content); a.download = "spark_slices.zip"; document.body.appendChild(a); a.click(); document.body.removeChild(a);
-                    statusIndicator.innerText = "打包完成"; statusIndicator.classList.remove('status-saving'); statusIndicator.classList.add('status-saved'); setTimeout(() => statusIndicator.classList.remove('visible'), 2000);
+            // 生成 blobs
+            const blobs = [];
+            for (let i = 0; i < screenCount; i++) {
+                const dataURL = canvas.toDataURL({ 
+                    format: 'png', quality: 1, multiplier: 2, 
+                    left: i * SCREEN_WIDTH, top: 0, width: SCREEN_WIDTH, height: SCREEN_HEIGHT 
                 });
-            } catch (e) {
-                console.error(e); alert("导出失败");
-                statusIndicator.innerText = "导出失败"; statusIndicator.classList.remove('status-saving');
-            } finally {
-                canvas.setViewportTransform(originalVpt);
-                canvas.setWidth(originalWidth);
-                canvas.setHeight(originalHeight);
-                gridLines.forEach(l => l.visible = true);
-                updateWorkspace();
-                canvas.requestRenderAll();
+                const blob = await (await fetch(dataURL)).blob();
+                blobs.push(blob);
             }
+
+            // 尝试调用原生分享 (Web Share API)
+            // 需要检测: 1. 支持 navigator.share 2. 支持 files 参数
+            let shareSuccess = false;
+            try {
+                if (navigator.share && navigator.canShare) {
+                    const files = blobs.map((blob, i) => new File([blob], `spark_slice_${i+1}.png`, { type: 'image/png' }));
+                    if (navigator.canShare({ files })) {
+                        statusIndicator.innerText = "调起分享...";
+                        await navigator.share({
+                            files: files,
+                            title: 'Spark Canvas 导出',
+                            text: '由 Spark Canvas 生成'
+                        });
+                        shareSuccess = true;
+                        statusIndicator.innerText = "已完成"; 
+                        statusIndicator.classList.remove('status-saving'); statusIndicator.classList.add('status-saved');
+                    }
+                }
+            } catch (err) {
+                console.log("Share failed or cancelled", err);
+                // Share 失败不一定意味着出错，用户取消也算，所以这里不一定报错，可以继续降级
+            }
+
+            // 如果没有分享成功（不支持或用户取消/失败），则降级为 ZIP
+            if (!shareSuccess) {
+                statusIndicator.innerText = "正在打包ZIP...";
+                try {
+                    const zip = new JSZip();
+                    blobs.forEach((blob, i) => {
+                        zip.file(`spark_slice_${i + 1}.png`, blob);
+                    });
+                    const content = await zip.generateAsync({type:"blob"});
+                    const a = document.createElement('a'); a.href = URL.createObjectURL(content); a.download = "spark_slices.zip"; document.body.appendChild(a); a.click(); document.body.removeChild(a);
+                    statusIndicator.innerText = "ZIP已下载"; statusIndicator.classList.remove('status-saving'); statusIndicator.classList.add('status-saved');
+                } catch (e) {
+                    statusIndicator.innerText = "导出失败";
+                }
+            }
+
+            // 恢复现场
+            setTimeout(() => statusIndicator.classList.remove('visible'), 2000);
+            canvas.setViewportTransform(originalVpt);
+            canvas.setWidth(originalWidth);
+            canvas.setHeight(originalHeight);
+            gridLines.forEach(l => l.visible = true);
+            updateWorkspace();
+            canvas.requestRenderAll();
         }
         
         initDB();
