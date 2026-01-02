@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Spark Canvas - V86 (UI聚合版)</title>
+    <title>Spark Canvas - V89 (智能菜单版)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
     
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -109,7 +109,6 @@
         .text-color-dot { width: 14px; height: 14px; border-radius: 50%; cursor: pointer; border: 1px solid rgba(255,255,255,0.2); transition: transform 0.2s; }
         .text-color-dot:hover { transform: scale(1.2); border-color: white; }
 
-        /* V86: New Control Row Styles */
         .align-toolbar { display: flex; gap: 3px; background: rgba(255,255,255,0.05); border-radius: 8px; padding: 3px; margin-bottom: 4px; }
         .align-btn { flex: 1; text-align: center; padding: 5px 0; font-size: 11px; color: #ccc; cursor: pointer; border-radius: 6px; font-weight: bold; letter-spacing: 0; }
         .align-btn:hover { background: #555; color: white; }
@@ -412,6 +411,27 @@
             return { x: e.clientX, y: e.clientY };
         }
 
+        // V89: Helper to categorize types
+        function getBroadType(type) {
+            if (type === 'i-text' || type === 'text' || type === 'textbox') return 'text';
+            if (type === 'image') return 'image';
+            return 'other';
+        }
+
+        // V89: Helper to update menu state (Lock button, etc) without reopening
+        function updateContextMenuState(target) {
+            const lockItemText = document.getElementById('menu-lock-text');
+            const lockIcon = document.querySelector('#menu-lock .menu-icon-span');
+            
+            if (target.lockMovementX) {
+                lockItemText.innerText = "解锁";
+                lockIcon.innerText = "🔓";
+            } else {
+                lockItemText.innerText = "锁定";
+                lockIcon.innerText = "🔒";
+            }
+        }
+
         canvas.on('mouse:down', function(opt) {
             const evt = opt.e;
             const target = opt.target;
@@ -428,6 +448,27 @@
             lastX = pos.x; lastY = pos.y;
             mouseDownPoint = { x: pos.x, y: pos.y };
 
+            // V89: Smart Menu Logic
+            if (contextMenu.style.display === 'block' && opt.button !== 3) {
+                if (!target || target === bgRect) {
+                    // Clicked background -> Close
+                    contextMenu.style.display = 'none';
+                } else {
+                    // Clicked an object -> Check type
+                    const currentType = getBroadType(target.type);
+                    const menuType = contextMenu.dataset.currentType; 
+                    
+                    if (currentType !== menuType) {
+                        // Different type -> Close
+                        contextMenu.style.display = 'none';
+                    } else {
+                        // Same type -> Keep open and update UI state
+                        updateContextMenuState(target);
+                    }
+                }
+            }
+
+            // Normal Drag Logic (V85)
             if (target && target !== bgRect) {
                 if (target.lockMovementX) {
                     isDraggingCanvas = true;
@@ -445,7 +486,6 @@
             }
             
             if (bgPanel.style.display === 'block') bgPanel.style.display = 'none';
-            contextMenu.style.display = 'none';
             
             if (target && target !== bgRect && evt.type === 'touchstart') {
                 longPressTimer = setTimeout(() => {
@@ -610,6 +650,7 @@
                     }
                     canvas.requestRenderAll();
                     triggerAutoSave();
+                    updateContextMenuState(obj); // Update UI immediately
                     break;
                 case 'top': obj.bringToFront(); break; case 'bottom': obj.sendToBack(); break;
                 case 'up': obj.bringForward(); break; case 'down': obj.sendBackwards(); break;
@@ -644,7 +685,19 @@
             }
             if(bgRect) canvas.sendToBack(bgRect);
             bringGridToFront(); canvas.renderAll(); triggerAutoSave();
-            contextMenu.style.display = 'none';
+            
+            const keepOpen = [
+                'weight-up', 'weight-down', 
+                'spacing-up', 'spacing-down', 
+                'line-height-up', 'line-height-down', 
+                'align-left', 'align-center', 'align-right',
+                'top', 'bottom', 'up', 'down',
+                'lock-toggle' // Lock toggle should also keep menu open to see result
+            ];
+            
+            if (!keepOpen.includes(action)) {
+                contextMenu.style.display = 'none';
+            }
         }
 
         // V75: Menu positioning logic
@@ -657,18 +710,11 @@
             const imageItems = document.querySelectorAll('.image-menu-item');
             const textItems = document.querySelectorAll('.text-menu-item');
 
-            // 1. Lock Button Logic
-            const lockItem = document.getElementById('menu-lock');
-            const lockItemText = document.getElementById('menu-lock-text');
-            const lockIcon = document.querySelector('#menu-lock .menu-icon-span');
-            
-            if (target.lockMovementX) {
-                lockItemText.innerText = "解锁";
-                lockIcon.innerText = "🔓";
-            } else {
-                lockItemText.innerText = "锁定";
-                lockIcon.innerText = "🔒";
-            }
+            // V89: Store menu type
+            contextMenu.dataset.currentType = getBroadType(type);
+
+            // Update UI State
+            updateContextMenuState(target);
 
             if (type === 'image') {
                 imageItems.forEach(el => el.style.display = 'flex');
@@ -817,7 +863,6 @@
             } 
         }
 
-        // V78: 完美吸附逻辑（解耦计算）
         let ctxLines = [];
         canvas.on('object:moving', function(e) {
             const obj = e.target;
@@ -834,21 +879,17 @@
 
             let snappedX = false, snappedY = false;
 
-            // X 轴吸附计算
             if (Math.abs(objCenter.x - screenCenterX) < threshold) {
                 finalX = screenCenterX;
                 drawGuideline(screenCenterX, 0, screenCenterX, SCREEN_HEIGHT);
                 snappedX = true;
             }
-
-            // Y 轴吸附计算
             if (Math.abs(objCenter.y - screenCenterY) < threshold) {
                 finalY = screenCenterY;
                 drawGuideline(pageIndex * SCREEN_WIDTH, screenCenterY, (pageIndex + 1) * SCREEN_WIDTH, screenCenterY);
                 snappedY = true;
             }
 
-            // 物体间吸附
             if (!snappedX || !snappedY) {
                 canvas.getObjects().forEach(target => {
                     if (target === obj || target === bgRect || target.excludeFromExport) return;
@@ -884,7 +925,6 @@
             if (!db || isInternalUpdate) return;
             statusIndicator.innerText = "保存中..."; statusIndicator.classList.add('visible', 'status-saving');
             canvas.clipPath = null;
-            // V81: 保存时记录锁定状态
             const json = canvas.toJSON(['isBackground', 'lockMovementX', 'lockMovementY', 'lockRotation', 'lockScalingX', 'lockScalingY', 'hasControls', 'borderColor']);
             updateWorkspace(); 
             const saveData = { id: "autosave", canvas: json, screenCount: screenCount, bgFill: currentBgFill, updated: new Date().getTime() };
@@ -921,7 +961,6 @@
                                 obj.set('shadow', null);
                                 obj.set('objectCaching', false);
                             }
-                            // V81: 恢复锁定状态的视觉效果
                             if (obj.lockMovementX) {
                                 obj.set({ hasControls: false, borderColor: '#ff453a' });
                             }
