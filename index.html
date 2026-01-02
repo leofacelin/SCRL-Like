@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Spark Canvas - V76 (对齐修正版)</title>
+    <title>Spark Canvas - V78 (完美吸附版)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
     
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -669,6 +669,10 @@
             });
         }
 
+        function handleFontSelection(select) {
+            changeFont(select.value);
+        }
+
         function showModal() { confirmModal.style.display = 'block'; }
         function closeModal() { confirmModal.style.display = 'none'; }
         
@@ -739,17 +743,17 @@
             } 
         }
 
-        // V76: 修正后的对齐吸附算法
+        // V78: 完美吸附逻辑（解耦计算）
         let ctxLines = [];
         canvas.on('object:moving', function(e) {
             const obj = e.target;
             const threshold = 10; 
             ctxLines.forEach(line => canvas.remove(line)); ctxLines = [];
             
-            // 核心修复：获取物体绝对几何中心
+            // 获取物体的当前几何中心（鼠标拖拽到的位置）
             const objCenter = obj.getCenterPoint();
-            const objCenterX = objCenter.x;
-            const objCenterY = objCenter.y;
+            let finalX = objCenter.x;
+            let finalY = objCenter.y;
             
             const pageIndex = Math.floor((obj.left + obj.width * obj.scaleX / 2) / SCREEN_WIDTH);
             const screenCenterX = pageIndex * SCREEN_WIDTH + SCREEN_WIDTH / 2;
@@ -757,44 +761,44 @@
 
             let snappedX = false, snappedY = false;
 
-            // X轴：吸附到屏幕中心
-            if (Math.abs(objCenterX - screenCenterX) < threshold) {
-                // 核心修复：使用 setPositionByOrigin 移动中心点
-                obj.setPositionByOrigin(new fabric.Point(screenCenterX, objCenterY), 'center', 'center');
+            // X 轴吸附计算
+            if (Math.abs(objCenter.x - screenCenterX) < threshold) {
+                finalX = screenCenterX;
                 drawGuideline(screenCenterX, 0, screenCenterX, SCREEN_HEIGHT);
                 snappedX = true;
             }
-            // Y轴：吸附到屏幕中心
-            if (Math.abs(objCenterY - screenCenterY) < threshold) {
-                obj.setPositionByOrigin(new fabric.Point(objCenterX, screenCenterY), 'center', 'center');
+
+            // Y 轴吸附计算
+            if (Math.abs(objCenter.y - screenCenterY) < threshold) {
+                finalY = screenCenterY;
                 drawGuideline(pageIndex * SCREEN_WIDTH, screenCenterY, (pageIndex + 1) * SCREEN_WIDTH, screenCenterY);
                 snappedY = true;
             }
 
-            // 物体间吸附
+            // 物体间吸附（如果还没吸附到屏幕中心）
             if (!snappedX || !snappedY) {
                 canvas.getObjects().forEach(target => {
                     if (target === obj || target === bgRect || target.excludeFromExport) return;
                     
                     const tCenter = target.getCenterPoint();
-                    const tCX = tCenter.x;
-                    const tCY = tCenter.y;
-
-                    // X
-                    if (!snappedX && Math.abs(objCenterX - tCX) < threshold) {
-                        obj.setPositionByOrigin(new fabric.Point(tCX, objCenterY), 'center', 'center');
-                        drawGuideline(tCX, Math.min(obj.top, target.top)-50, tCX, Math.max(obj.top+obj.height*obj.scaleY, target.top+target.height*target.scaleY)+50);
+                    
+                    if (!snappedX && Math.abs(objCenter.x - tCenter.x) < threshold) {
+                        finalX = tCenter.x;
+                        drawGuideline(tCenter.x, Math.min(obj.top, target.top)-50, tCenter.x, Math.max(obj.top+obj.height*obj.scaleY, target.top+target.height*target.scaleY)+50);
                         snappedX = true;
                     }
-                    // Y
-                    if (!snappedY && Math.abs(objCenterY - tCY) < threshold) {
-                        obj.setPositionByOrigin(new fabric.Point(objCenterX, tCY), 'center', 'center');
-                        drawGuideline(Math.min(obj.left, target.left)-50, tCY, Math.max(obj.left+obj.width*obj.scaleX, target.left+target.width*target.scaleX)+50, tCY);
+                    if (!snappedY && Math.abs(objCenter.y - tCenter.y) < threshold) {
+                        finalY = tCenter.y;
+                        drawGuideline(Math.min(obj.left, target.left)-50, tCenter.y, Math.max(obj.left+obj.width*obj.scaleX, target.left+target.width*target.scaleX)+50, tCenter.y);
                         snappedY = true;
                     }
                 });
             }
+
+            // 最后统一应用位置：将物体的中心点移动到计算出的 (finalX, finalY)
+            obj.setPositionByOrigin(new fabric.Point(finalX, finalY), 'center', 'center');
         });
+
         canvas.on('mouse:up', function() { ctxLines.forEach(line => canvas.remove(line)); ctxLines = []; });
         function drawGuideline(x1, y1, x2, y2) {
             const line = new fabric.Line([x1, y1, x2, y2], { stroke: '#ff0077', strokeWidth: 1, strokeDashArray: [4, 4], selectable: false, evented: false, excludeFromExport: true });
@@ -813,7 +817,7 @@
             statusIndicator.innerText = "保存中..."; statusIndicator.classList.add('visible', 'status-saving');
             
             canvas.clipPath = null;
-            const json = canvas.toJSON();
+            const json = canvas.toJSON(['isBackground']);
             updateWorkspace(); 
             const saveData = { id: "autosave", canvas: json, screenCount: screenCount, bgFill: currentBgFill, updated: new Date().getTime() };
 
@@ -831,11 +835,15 @@
                 if (data) {
                     screenCount = data.screenCount || 1; 
                     canvas.loadFromJSON(data.canvas, () => {
-                        if (data.bgFill) currentBgFill = data.bgFill;
-                        else {
-                            const loadedBg = canvas.getObjects().find(o => o.isBackground);
-                            if (loadedBg) { currentBgFill = loadedBg.fill; canvas.remove(loadedBg); }
-                        }
+                        const objectsToRemove = [];
+                        canvas.getObjects().forEach(obj => {
+                            if (obj.isBackground || (obj.type === 'rect' && obj.width >= SCREEN_WIDTH && obj.top === 0 && obj.left === 0)) {
+                                currentBgFill = obj.fill; 
+                                objectsToRemove.push(obj); 
+                            }
+                        });
+                        objectsToRemove.forEach(obj => canvas.remove(obj));
+
                         updateWorkspace(); 
                         canvas.getObjects().forEach(obj => { 
                             if(obj === bgRect) return;
