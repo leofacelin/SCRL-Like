@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Spark Canvas - V78 (完美吸附版)</title>
+    <title>Spark Canvas - V86 (UI聚合版)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
     
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -77,7 +77,6 @@
             opacity: 0; width: 100%; height: 100%; cursor: pointer; 
             position: absolute; top:0; left:0; -webkit-appearance: none;
         }
-        select.font-select option.upload-option { color: var(--accent-color); font-weight: bold; }
 
         #bg-panel { display: none; position: absolute; bottom: 90px; left: 50%; transform: translateX(-50%); background: rgba(30, 30, 30, 0.95); backdrop-filter: blur(20px); border: 1px solid #444; border-radius: 16px; padding: 15px; box-shadow: 0 10px 40px rgba(0,0,0,0.8); z-index: 90; animation: panelUp 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275); width: 220px; padding-bottom: env(safe-area-inset-bottom, 15px); }
         @keyframes panelUp { from { opacity: 0; transform: translate(-50%, 20px); } to { opacity: 1; transform: translate(-50%, 0); } }
@@ -93,7 +92,7 @@
         .preset-dot { width: 100%; height: 100%; border-radius: 50%; cursor: pointer; border: 1px solid rgba(255,255,255,0.1); transition: transform 0.2s; }
         .preset-dot:hover { transform: scale(1.4); border-color: white; z-index: 2; box-shadow: 0 2px 5px rgba(0,0,0,0.5); }
 
-        #context-menu { display: none; position: absolute; z-index: 2000; width: 130px; background: rgba(40, 40, 40, 0.98); backdrop-filter: blur(20px); border: 1px solid #555; border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.8); padding: 4px; animation: menuFadeIn 0.15s ease-out; }
+        #context-menu { display: none; position: absolute; z-index: 2000; width: 140px; background: rgba(40, 40, 40, 0.98); backdrop-filter: blur(20px); border: 1px solid #555; border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.8); padding: 4px; animation: menuFadeIn 0.15s ease-out; }
         @keyframes menuFadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
         
         .menu-header { font-size: 9px; color: #888; padding: 3px 6px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 2px; display: none; }
@@ -110,9 +109,17 @@
         .text-color-dot { width: 14px; height: 14px; border-radius: 50%; cursor: pointer; border: 1px solid rgba(255,255,255,0.2); transition: transform 0.2s; }
         .text-color-dot:hover { transform: scale(1.2); border-color: white; }
 
+        /* V86: New Control Row Styles */
         .align-toolbar { display: flex; gap: 3px; background: rgba(255,255,255,0.05); border-radius: 8px; padding: 3px; margin-bottom: 4px; }
         .align-btn { flex: 1; text-align: center; padding: 5px 0; font-size: 11px; color: #ccc; cursor: pointer; border-radius: 6px; font-weight: bold; letter-spacing: 0; }
         .align-btn:hover { background: #555; color: white; }
+
+        .control-row { display: none; justify-content: space-between; align-items: center; padding: 4px 8px; color: #ccc; font-size: 11px; margin-bottom: 1px; }
+        .control-label { flex-grow: 1; opacity: 0.8; }
+        .control-group { display: flex; gap: 4px; }
+        .control-btn { background: rgba(255,255,255,0.1); border-radius: 4px; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background 0.2s; font-weight: bold; color: #ddd; }
+        .control-btn:hover { background: #555; color: white; }
+        .control-btn:active { transform: scale(0.9); }
 
         .show-always { display: flex !important; } 
         .show-header { display: block !important; }
@@ -176,6 +183,10 @@
             <div class="layer-btn" onclick="menuAction('bottom')">⤓</div>
         </div>
         
+        <div class="menu-item show-always" id="menu-lock" onclick="menuAction('lock-toggle')">
+            <span class="menu-icon-span">🔒</span> <span id="menu-lock-text">锁定</span>
+        </div>
+
         <div class="menu-header image-menu-item">效果 Effect</div>
         <div class="menu-item image-menu-item" onclick="menuAction('flipX')"><span class="menu-icon-span">⇄</span> 水平翻转</div>
         <div class="menu-item image-menu-item" onclick="menuAction('filter-bw')"><span class="menu-icon-span">◐</span> 黑白滤镜</div>
@@ -190,17 +201,34 @@
             <div class="text-color-dot" style="background: #007AFF" onclick="changeTextColor('#007AFF')"></div>
             <div class="text-color-dot" style="background: #FF3B30" onclick="changeTextColor('#FF3B30')"></div>
         </div>
+        
         <div class="align-toolbar text-menu-item">
             <div class="align-btn" onclick="menuAction('align-left')">|←</div>
             <div class="align-btn" onclick="menuAction('align-center')">→|←</div>
             <div class="align-btn" onclick="menuAction('align-right')">→|</div>
         </div>
-        <div class="menu-item text-menu-item" onclick="menuAction('weight-up')"><span class="menu-icon-span">B↑</span> 增加字重</div>
-        <div class="menu-item text-menu-item" onclick="menuAction('weight-down')"><span class="menu-icon-span">B↓</span> 缩小字重</div>
-        <div class="menu-item text-menu-item" onclick="menuAction('spacing-up')"><span class="menu-icon-span">←→</span> 字间距 +</div>
-        <div class="menu-item text-menu-item" onclick="menuAction('spacing-down')"><span class="menu-icon-span">→←</span> 字间距 -</div>
-        <div class="menu-item text-menu-item" onclick="menuAction('line-height-up')"><span class="menu-icon-span">↕</span> 行间距 +</div>
-        <div class="menu-item text-menu-item" onclick="menuAction('line-height-down')"><span class="menu-icon-span">⇈</span> 行间距 -</div>
+
+        <div class="control-row text-menu-item">
+            <span class="control-label">字重 Weight</span>
+            <div class="control-group">
+                <div class="control-btn" onclick="menuAction('weight-down')">－</div>
+                <div class="control-btn" onclick="menuAction('weight-up')">＋</div>
+            </div>
+        </div>
+        <div class="control-row text-menu-item">
+            <span class="control-label">字距 Spacing</span>
+            <div class="control-group">
+                <div class="control-btn" onclick="menuAction('spacing-down')">－</div>
+                <div class="control-btn" onclick="menuAction('spacing-up')">＋</div>
+            </div>
+        </div>
+        <div class="control-row text-menu-item">
+            <span class="control-label">行高 Height</span>
+            <div class="control-group">
+                <div class="control-btn" onclick="menuAction('line-height-down')">－</div>
+                <div class="control-btn" onclick="menuAction('line-height-up')">＋</div>
+            </div>
+        </div>
 
         <div class="menu-item show-always" onclick="menuAction('duplicate')"><span class="menu-icon-span">❐</span> 复制</div>
         <div class="menu-item delete show-always" onclick="menuAction('delete')"><span class="menu-icon-span">🗑</span> 删除</div>
@@ -374,6 +402,8 @@
 
         let isDraggingCanvas = false;
         let lastX, lastY;
+        let mouseDownPoint = {x:0, y:0};
+        let mouseDownTarget = null; 
 
         function getClientPos(e) {
             if (e.touches && e.touches.length > 0) {
@@ -394,28 +424,36 @@
                 return;
             }
 
-            const active = canvas.getActiveObject();
+            const pos = getClientPos(evt);
+            lastX = pos.x; lastY = pos.y;
+            mouseDownPoint = { x: pos.x, y: pos.y };
 
             if (target && target !== bgRect) {
-                isDraggingCanvas = false;
-                target.setCoords();
+                if (target.lockMovementX) {
+                    isDraggingCanvas = true;
+                    mouseDownTarget = target; 
+                    canvas.discardActiveObject(); 
+                    canvas.requestRenderAll();
+                } else {
+                    isDraggingCanvas = false;
+                    mouseDownTarget = null;
+                    target.setCoords();
+                }
             } else {
                 isDraggingCanvas = true;
-                canvas.selection = false;
-                
-                const pos = getClientPos(evt);
-                lastX = pos.x;
-                lastY = pos.y;
+                mouseDownTarget = null;
             }
             
             if (bgPanel.style.display === 'block') bgPanel.style.display = 'none';
             contextMenu.style.display = 'none';
             
             if (target && target !== bgRect && evt.type === 'touchstart') {
-                isDraggingCanvas = false;
-                if (target.__corner) return; 
                 longPressTimer = setTimeout(() => {
-                    if (!canvas.isDrawingMode && !isDraggingCanvas && !canvas.getActiveObject().isMoving) {
+                    if (isDraggingCanvas && Math.abs(lastX - pos.x) < 5 && Math.abs(lastY - pos.y) < 5) {
+                        isDraggingCanvas = false; 
+                        canvas.setActiveObject(target); 
+                        openContextMenu(opt);
+                    } else if (!isDraggingCanvas && !canvas.getActiveObject().isMoving) {
                         openContextMenu(opt);
                     }
                 }, 500);
@@ -428,8 +466,20 @@
                 const evt = opt.e;
                 const pos = getClientPos(evt);
                 if (pos.x === undefined || pos.y === undefined) return;
-                const deltaX = pos.x - lastX;
-                const deltaY = pos.y - lastY;
+                
+                let deltaX = pos.x - lastX;
+                let deltaY = pos.y - lastY;
+
+                if (Math.abs(deltaX) > 2 || Math.abs(deltaY) > 2) {
+                    clearTimeout(longPressTimer);
+                }
+
+                const visualHeight = SCREEN_HEIGHT * canvas.getZoom();
+                const viewportHeight = canvas.getHeight();
+                if (visualHeight <= viewportHeight) {
+                    deltaY = 0; 
+                }
+
                 canvas.relativePan({ x: deltaX, y: deltaY });
                 lastX = pos.x;
                 lastY = pos.y;
@@ -443,6 +493,17 @@
         });
 
         canvas.on('mouse:up', function(opt) {
+            const evt = opt.e;
+            const pos = getClientPos(evt);
+            
+            if (isDraggingCanvas && mouseDownTarget && mouseDownTarget.lockMovementX) {
+                const dist = Math.sqrt(Math.pow(pos.x - mouseDownPoint.x, 2) + Math.pow(pos.y - mouseDownPoint.y, 2));
+                if (dist < 5) { 
+                    canvas.setActiveObject(mouseDownTarget);
+                    canvas.requestRenderAll();
+                }
+            }
+
             isDraggingCanvas = false;
             isObjectMoving = false;
             clearTimeout(longPressTimer);
@@ -532,6 +593,24 @@
         function menuAction(action) {
             const obj = canvas.getActiveObject(); if (!obj) return;
             switch(action) {
+                case 'lock-toggle':
+                    const isLocked = obj.lockMovementX;
+                    if (isLocked) {
+                        obj.set({
+                            lockMovementX: false, lockMovementY: false,
+                            lockRotation: false, lockScalingX: false, lockScalingY: false,
+                            hasControls: true, borderColor: '#007AFF'
+                        });
+                    } else {
+                        obj.set({
+                            lockMovementX: true, lockMovementY: true,
+                            lockRotation: true, lockScalingX: true, lockScalingY: true,
+                            hasControls: false, borderColor: '#ff453a'
+                        });
+                    }
+                    canvas.requestRenderAll();
+                    triggerAutoSave();
+                    break;
                 case 'top': obj.bringToFront(); break; case 'bottom': obj.sendToBack(); break;
                 case 'up': obj.bringForward(); break; case 'down': obj.sendBackwards(); break;
                 case 'delete': canvas.remove(obj); canvas.discardActiveObject(); break;
@@ -577,6 +656,19 @@
             const type = target.type;
             const imageItems = document.querySelectorAll('.image-menu-item');
             const textItems = document.querySelectorAll('.text-menu-item');
+
+            // 1. Lock Button Logic
+            const lockItem = document.getElementById('menu-lock');
+            const lockItemText = document.getElementById('menu-lock-text');
+            const lockIcon = document.querySelector('#menu-lock .menu-icon-span');
+            
+            if (target.lockMovementX) {
+                lockItemText.innerText = "解锁";
+                lockIcon.innerText = "🔓";
+            } else {
+                lockItemText.innerText = "锁定";
+                lockIcon.innerText = "🔒";
+            }
 
             if (type === 'image') {
                 imageItems.forEach(el => el.style.display = 'flex');
@@ -669,24 +761,6 @@
             });
         }
 
-        function handleFontSelection(select) {
-            changeFont(select.value);
-        }
-
-        function showModal() { confirmModal.style.display = 'block'; }
-        function closeModal() { confirmModal.style.display = 'none'; }
-        
-        function executeClear() {
-            canvas.clear(); 
-            screenCount = 1; 
-            currentBgFill = '#ffffff'; 
-            updateWorkspace();
-            initViewport();
-            if(db) { const tx = db.transaction(STORE_NAME, "readwrite"); tx.objectStore(STORE_NAME).delete("last_session"); }
-            statusIndicator.innerText = "画布已重置"; statusIndicator.classList.add('visible');
-            closeModal();
-        }
-
         function changeFont(fontFamily) {
             const activeObj = canvas.getActiveObject();
             if (activeObj && (activeObj.type === 'i-text' || activeObj.type === 'text')) {
@@ -708,7 +782,7 @@
 
         function addText() {
             const center = canvas.getVpCenter();
-            const selectedFont = fontSelector.value;
+            const selectedFont = document.getElementById('font-family-selector').value;
             const text = new fabric.IText('双击编辑', {
                 left: center.x, top: center.y,
                 fontFamily: selectedFont, 
@@ -750,7 +824,6 @@
             const threshold = 10; 
             ctxLines.forEach(line => canvas.remove(line)); ctxLines = [];
             
-            // 获取物体的当前几何中心（鼠标拖拽到的位置）
             const objCenter = obj.getCenterPoint();
             let finalX = objCenter.x;
             let finalY = objCenter.y;
@@ -775,13 +848,11 @@
                 snappedY = true;
             }
 
-            // 物体间吸附（如果还没吸附到屏幕中心）
+            // 物体间吸附
             if (!snappedX || !snappedY) {
                 canvas.getObjects().forEach(target => {
                     if (target === obj || target === bgRect || target.excludeFromExport) return;
-                    
                     const tCenter = target.getCenterPoint();
-                    
                     if (!snappedX && Math.abs(objCenter.x - tCenter.x) < threshold) {
                         finalX = tCenter.x;
                         drawGuideline(tCenter.x, Math.min(obj.top, target.top)-50, tCenter.x, Math.max(obj.top+obj.height*obj.scaleY, target.top+target.height*target.scaleY)+50);
@@ -794,11 +865,8 @@
                     }
                 });
             }
-
-            // 最后统一应用位置：将物体的中心点移动到计算出的 (finalX, finalY)
             obj.setPositionByOrigin(new fabric.Point(finalX, finalY), 'center', 'center');
         });
-
         canvas.on('mouse:up', function() { ctxLines.forEach(line => canvas.remove(line)); ctxLines = []; });
         function drawGuideline(x1, y1, x2, y2) {
             const line = new fabric.Line([x1, y1, x2, y2], { stroke: '#ff0077', strokeWidth: 1, strokeDashArray: [4, 4], selectable: false, evented: false, excludeFromExport: true });
@@ -815,12 +883,11 @@
         function saveState() {
             if (!db || isInternalUpdate) return;
             statusIndicator.innerText = "保存中..."; statusIndicator.classList.add('visible', 'status-saving');
-            
             canvas.clipPath = null;
-            const json = canvas.toJSON(['isBackground']);
+            // V81: 保存时记录锁定状态
+            const json = canvas.toJSON(['isBackground', 'lockMovementX', 'lockMovementY', 'lockRotation', 'lockScalingX', 'lockScalingY', 'hasControls', 'borderColor']);
             updateWorkspace(); 
             const saveData = { id: "autosave", canvas: json, screenCount: screenCount, bgFill: currentBgFill, updated: new Date().getTime() };
-
             const tx = db.transaction(STORE_NAME, "readwrite");
             tx.objectStore(STORE_NAME).put(saveData, "last_session");
             tx.oncomplete = () => { 
@@ -843,7 +910,6 @@
                             }
                         });
                         objectsToRemove.forEach(obj => canvas.remove(obj));
-
                         updateWorkspace(); 
                         canvas.getObjects().forEach(obj => { 
                             if(obj === bgRect) return;
@@ -854,6 +920,10 @@
                                 obj.setControlsVisibility({ mt: false, mb: false, ml: false, mr: false });
                                 obj.set('shadow', null);
                                 obj.set('objectCaching', false);
+                            }
+                            // V81: 恢复锁定状态的视觉效果
+                            if (obj.lockMovementX) {
+                                obj.set({ hasControls: false, borderColor: '#ff453a' });
                             }
                         });
                         drawGrid(); 
