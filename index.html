@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Spark Canvas - V91 (稳定性修复版)</title>
+    <title>Spark Canvas - V95 (吸附修复增强版)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
     <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
     
@@ -67,7 +67,6 @@
         button.primary { background: var(--accent-color); color: white; }
         button.danger { background: rgba(255, 69, 58, 0.15); color: var(--danger-color); }
         
-        /* V91 Fix: Ensure clicks pass through icons to the button */
         button i, .font-select-btn i, .layer-btn i, .control-btn i { pointer-events: none; }
         button i { font-size: 22px; }
 
@@ -331,7 +330,6 @@
 
         function updateWorkspace() {
             isInternalUpdate = true;
-            // V91 Fix: Check if bgRect is valid before removing
             if (bgRect && canvas.contains(bgRect)) canvas.remove(bgRect);
             
             bgRect = new fabric.Rect({
@@ -487,6 +485,7 @@
             if (bgPanel.style.display === 'block') bgPanel.style.display = 'none';
             
             if (target && target !== bgRect && evt.type === 'touchstart') {
+                if (target.__corner) return;
                 longPressTimer = setTimeout(() => {
                     if (isDraggingCanvas && Math.abs(lastX - pos.x) < 5 && Math.abs(lastY - pos.y) < 5) {
                         isDraggingCanvas = false; 
@@ -752,19 +751,14 @@
         function showModal() { confirmModal.style.display = 'block'; }
         function closeModal() { confirmModal.style.display = 'none'; }
         
-        // V91: Robust Clear Function
         function executeClear() {
             canvas.clear(); 
-            // V91 Fix: Reset variables that point to dead objects
             bgRect = null;
             gridLines = [];
-            
             screenCount = 1; 
             currentBgFill = '#ffffff'; 
-            
             updateWorkspace();
             initViewport();
-            
             if(db) { const tx = db.transaction(STORE_NAME, "readwrite"); tx.objectStore(STORE_NAME).delete("last_session"); }
             statusIndicator.innerText = "画布已重置"; statusIndicator.classList.add('visible');
             closeModal();
@@ -826,65 +820,11 @@
             } 
         }
 
-        function toggleBgPanel() {
-            const isVisible = bgPanel.style.display === 'block';
-            bgPanel.style.display = isVisible ? 'none' : 'block';
-        }
-
-        function changeBackgroundColor(color) {
-            currentBgFill = color;
-            if(bgRect) {
-                bgRect.set('fill', color);
-                canvas.requestRenderAll();
-                triggerAutoSave();
-            }
-        }
-
-        function handleFiles(files) {
-            if (!files || !files[0]) return;
-            const center = canvas.getVpCenter();
-            Array.from(files).forEach(file => {
-                const reader = new FileReader();
-                reader.onload = (f) => {
-                    fabric.Image.fromURL(f.target.result, (img) => {
-                        if (img.width > SCREEN_WIDTH) img.scaleToWidth(SCREEN_WIDTH * 0.8);
-                        const offsetX = (Math.random() * 40 - 20);
-                        const offsetY = (Math.random() * 40 - 20);
-                        img.set({ left: center.x - (img.getScaledWidth()/2) + offsetX, top: center.y - (img.getScaledHeight()/2) + offsetY });
-                        img.setControlsVisibility({ mt: false, mb: false, ml: false, mr: false });
-                        canvas.add(img); canvas.setActiveObject(img); bringGridToFront(); triggerAutoSave();
-                    });
-                };
-                reader.readAsDataURL(file);
-            });
-            document.getElementById('file-input').value = '';
-        }
-
-        function handleBgFile(files) {
-            if (!files || !files[0]) return;
-            const reader = new FileReader();
-            reader.onload = function(f) { applyPattern(f.target.result); };
-            reader.readAsDataURL(files[0]);
-            document.getElementById('bg-file-input').value = '';
-        }
-
-        function applyPattern(imgSrc) {
-            fabric.util.loadImage(imgSrc, function(img) {
-                if(!img) return;
-                const pattern = new fabric.Pattern({ source: img, repeat: 'repeat' });
-                currentBgFill = pattern;
-                if(bgRect) {
-                    bgRect.set('fill', pattern);
-                    canvas.requestRenderAll();
-                    triggerAutoSave();
-                }
-            });
-        }
-
+        // V95: Snapping Logic Fixed & Enhanced
         let ctxLines = [];
         canvas.on('object:moving', function(e) {
             const obj = e.target;
-            const threshold = 10; 
+            const threshold = 15; // V95: Increased threshold for better grab
             ctxLines.forEach(line => canvas.remove(line)); ctxLines = [];
             
             const objCenter = obj.getCenterPoint();
@@ -910,7 +850,9 @@
 
             if (!snappedX || !snappedY) {
                 canvas.getObjects().forEach(target => {
-                    if (target === obj || target === bgRect || target.excludeFromExport) return;
+                    // V95: Filter out invisible objects and strict bgRect check
+                    if (target === obj || target === bgRect || target.excludeFromExport || !target.visible) return;
+                    
                     const tCenter = target.getCenterPoint();
                     if (!snappedX && Math.abs(objCenter.x - tCenter.x) < threshold) {
                         finalX = tCenter.x;
@@ -925,11 +867,26 @@
                 });
             }
             obj.setPositionByOrigin(new fabric.Point(finalX, finalY), 'center', 'center');
+            canvas.requestRenderAll(); // V95: Force render to show guidelines instantly
         });
-        canvas.on('mouse:up', function() { ctxLines.forEach(line => canvas.remove(line)); ctxLines = []; });
+        
+        canvas.on('mouse:up', function() { 
+            ctxLines.forEach(line => canvas.remove(line)); 
+            ctxLines = []; 
+            canvas.requestRenderAll(); // V95 Clean up render
+        });
+
         function drawGuideline(x1, y1, x2, y2) {
-            const line = new fabric.Line([x1, y1, x2, y2], { stroke: '#ff0077', strokeWidth: 1, strokeDashArray: [4, 4], selectable: false, evented: false, excludeFromExport: true });
-            canvas.add(line); ctxLines.push(line);
+            const line = new fabric.Line([x1, y1, x2, y2], { 
+                stroke: '#ff0077', // Magenta for visibility
+                strokeWidth: 1, 
+                strokeDashArray: [4, 4], 
+                selectable: false, 
+                evented: false, 
+                excludeFromExport: true 
+            });
+            canvas.add(line); 
+            ctxLines.push(line);
         }
 
         function initDB() {
