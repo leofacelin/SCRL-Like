@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Spark Canvas - V123 (侧边栏视觉统一修正版)</title>
+    <title>Spark Canvas - V124 (漫游交互重构版)</title>
     
     <script src="https://cdn.staticfile.org/fabric.js/5.3.1/fabric.min.js"></script>
     
@@ -62,7 +62,6 @@
             box-sizing: border-box;
         }
 
-        /* --- V123: New Capsule Class for Side Bars --- */
         .side-glass-capsule {
             background: var(--glass-bg);
             backdrop-filter: blur(24px) saturate(180%);
@@ -70,8 +69,6 @@
             border: 1px solid var(--glass-border);
             box-shadow: var(--glass-shadow);
             box-sizing: border-box;
-            
-            /* V123: Shape Definition */
             border-radius: 20px; 
             padding: 6px; 
             display: flex; 
@@ -88,13 +85,12 @@
 
         .side-bar-bottom {
             position: fixed; 
-            /* Top will be set by JS dynamically */
             transition: left 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), top 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
         }
 
         .side-btn {
             width: 44px; height: 44px; 
-            border-radius: 14px; /* Squircle Shape for buttons */
+            border-radius: 14px; 
             display: flex; align-items: center; justify-content: center;
             font-size: 20px; color: var(--text-sub);
             cursor: pointer; 
@@ -112,7 +108,6 @@
 
         .side-btn.danger { color: #666; }
         .side-btn.danger:hover { background: rgba(255, 69, 58, 0.15); color: var(--danger-color); border-color: var(--danger-color); }
-
 
         /* Bottom Floating Dock */
         .bottom-dock-container {
@@ -544,8 +539,6 @@
             
             if(sideBarBottom) {
                 sideBarBottom.style.left = newLeft;
-                // V123: Correct calculation for alignment with canvas bottom
-                // Calculation: 2 buttons (44px*2) + gap (8px) + padding (6px*2) = 88 + 8 + 12 = 108px height.
                 sideBarBottom.style.top = (contentBottomEdge - 108) + 'px'; 
             }
         }
@@ -680,15 +673,7 @@
         canvas.on('mouse:down', function(opt) {
             const evt = opt.e;
             const target = opt.target;
-
-            cancelAnimationFrame(momentumID);
-            velocityX = 0; velocityY = 0;
-            lastMoveTime = Date.now();
-
-            if (addPopover.classList.contains('active')) {
-                toggleAddMenu(false);
-            }
-
+            
             if (opt.button === 3) {
                 if (target && target !== bgRect) {
                     canvas.setActiveObject(target);
@@ -697,74 +682,66 @@
                 return;
             }
 
+            cancelAnimationFrame(momentumID);
+            velocityX = 0; velocityY = 0;
+            lastMoveTime = Date.now();
+
             const pos = getClientPos(evt);
             lastX = pos.x; lastY = pos.y;
             mouseDownPoint = { x: pos.x, y: pos.y };
 
-            if (contextMenu.style.display === 'block' && opt.button !== 3) {
-                if (!target || target === bgRect) {
-                    contextMenu.style.display = 'none';
-                    document.getElementById('font-options-wrapper').classList.remove('active');
-                    document.getElementById('font-arrow-icon').className = "ri-arrow-right-s-line";
-                } else {
-                    const currentType = getBroadType(target.type);
-                    const menuType = contextMenu.dataset.currentType; 
-                    
-                    if (currentType !== menuType) {
-                        contextMenu.style.display = 'none';
-                        document.getElementById('font-options-wrapper').classList.remove('active');
-                    } else {
-                        updateContextMenuState(target);
-                    }
-                }
+            if (addPopover.classList.contains('active')) {
+                toggleAddMenu(false);
+            }
+            if (contextMenu.style.display === 'block') {
+                 if (!target || target === bgRect) {
+                     contextMenu.style.display = 'none';
+                     document.getElementById('font-options-wrapper').classList.remove('active');
+                     document.getElementById('font-arrow-icon').className = "ri-arrow-right-s-line";
+                 }
+            }
+            if (bgPanel.style.display === 'block') bgPanel.style.display = 'none';
+
+            const activeObject = canvas.getActiveObject();
+            
+            // Interaction Logic V124:
+            // 1. If hitting active object -> Drag it
+            if (target && target === activeObject) {
+                isDraggingCanvas = false;
+                return;
             }
 
-            if (target && target !== bgRect) {
-                if (target.lockMovementX) {
-                    isDraggingCanvas = true;
-                    mouseDownTarget = target; 
-                    canvas.discardActiveObject(); 
-                    canvas.requestRenderAll();
-                } else {
-                    isDraggingCanvas = false;
-                    mouseDownTarget = null;
-                    target.setCoords();
-                }
-            } else {
-                isDraggingCanvas = true;
-                mouseDownTarget = null;
+            // 2. Otherwise -> Pan mode
+            isDraggingCanvas = true;
+            mouseDownTarget = target;
+            if(activeObject) {
+                canvas.discardActiveObject(); 
+                canvas.requestRenderAll();
             }
-            
-            if (bgPanel.style.display === 'block') bgPanel.style.display = 'none';
-            
+
+            // Long press logic
             if (target && target !== bgRect && evt.type === 'touchstart') {
                 if (target.__corner) return;
                 longPressTimer = setTimeout(() => {
-                    const active = canvas.getActiveObject();
-                    if (isDraggingCanvas && Math.abs(lastX - pos.x) < 5 && Math.abs(lastY - pos.y) < 5) {
-                        isDraggingCanvas = false; 
-                        canvas.setActiveObject(target); 
+                     // If we haven't moved much, open menu
+                     if (Math.abs(lastX - getClientPos(evt).x) < 5) {
+                        isDraggingCanvas = false;
+                        canvas.setActiveObject(target);
                         openContextMenu(opt);
-                    } else if (!isDraggingCanvas && active && !active.isMoving && !active.isScaling && !active.isRotating) {
-                        openContextMenu(opt);
-                    }
+                     }
                 }, 500);
-            } else if (!target || target === bgRect) {
-                contextMenu.style.display = 'none';
-                document.getElementById('font-options-wrapper').classList.remove('active');
             }
         });
 
         let isObjectMoving = false;
         canvas.on('mouse:move', function(opt) {
+            const evt = opt.e;
+            const pos = getClientPos(evt);
+            if (pos.x === undefined || pos.y === undefined) return;
+
             if (isDraggingCanvas) {
-                const evt = opt.e;
-                const pos = getClientPos(evt);
-                if (pos.x === undefined || pos.y === undefined) return;
-                
                 const now = Date.now();
                 const dt = now - lastMoveTime;
-
                 let deltaX = pos.x - lastX;
                 let deltaY = pos.y - lastY;
 
@@ -781,8 +758,7 @@
                 }
 
                 if (layoutState.visualHeight <= layoutState.availableHeight) {
-                    deltaY = 0; 
-                    velocityY = 0; 
+                    deltaY = 0; velocityY = 0; 
                 }
 
                 const bounds = getCanvasBounds();
@@ -817,36 +793,34 @@
             const evt = opt.e;
             const pos = getClientPos(evt);
             
-            if (isDraggingCanvas && mouseDownTarget && mouseDownTarget.lockMovementX) {
+            if (isDraggingCanvas) {
                 const dist = Math.sqrt(Math.pow(pos.x - mouseDownPoint.x, 2) + Math.pow(pos.y - mouseDownPoint.y, 2));
-                if (dist < 5) { 
-                    canvas.setActiveObject(mouseDownTarget);
-                    canvas.requestRenderAll();
+                
+                // If it was a CLICK/TAP
+                if (dist < 5) {
+                    if (mouseDownTarget && mouseDownTarget !== bgRect) {
+                        canvas.setActiveObject(mouseDownTarget);
+                        canvas.requestRenderAll();
+                    }
+                } else {
+                    // It was a DRAG -> Momentum
+                    const timeSinceLastMove = Date.now() - lastMoveTime;
+                    if (timeSinceLastMove < 100) {
+                        applyMomentum();
+                    }
                 }
             }
-
-            if (isDraggingCanvas) {
-                const timeSinceLastMove = Date.now() - lastMoveTime;
-                if (timeSinceLastMove > 100) {
-                    velocityX = 0;
-                    velocityY = 0;
-                }
-                
-                const bounds = getCanvasBounds();
-                const currentX = canvas.viewportTransform[4];
-                
-                if (currentX > bounds.max || currentX < bounds.min) {
-                    velocityX = 0; velocityY = 0;
-                    snapBack();
-                } else {
-                    applyMomentum();
-                }
+            
+            const bounds = getCanvasBounds();
+            const currentX = canvas.viewportTransform[4];
+            if (currentX > bounds.max || currentX < bounds.min) {
+                velocityX = 0; velocityY = 0;
+                snapBack();
             }
 
             isDraggingCanvas = false;
             isObjectMoving = false;
             clearTimeout(longPressTimer);
-            canvas.setViewportTransform(canvas.viewportTransform); 
             updateSideBarPosition();
             updateHitRegions(); 
         });
