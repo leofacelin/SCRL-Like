@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Spark Canvas - V102 (焦点跟随+惯性+阻尼回弹)</title>
+    <title>Spark Canvas - V103 (V102-RubberBand纯净导出版)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
     <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
     
@@ -1309,29 +1309,17 @@
                 blobs.push(blob);
             }
 
-            let shareSuccess = false;
-            try {
-                if (navigator.share && navigator.canShare) {
-                    const files = blobs.map((blob, i) => new File([blob], `spark_slice_${i+1}.png`, { type: 'image/png' }));
-                    if (navigator.canShare({ files })) {
-                        statusIndicator.innerText = "调起分享...";
-                        await navigator.share({ files: files, title: 'Spark Canvas', text: '由 Spark Canvas 生成' });
-                        shareSuccess = true;
-                        statusIndicator.innerText = "已完成"; statusIndicator.classList.remove('status-saving'); statusIndicator.classList.add('status-saved');
-                    }
-                }
-            } catch (err) { console.log("Share skipped", err); }
-
-            if (!shareSuccess) {
-                statusIndicator.innerText = "开始下载...";
-                for (let i = 0; i < blobs.length; i++) {
-                    statusIndicator.innerText = `下载中 ${i+1}/${blobs.length}`;
-                    const a = document.createElement('a'); a.href = URL.createObjectURL(blobs[i]); a.download = `spark_slice_${i + 1}.png`;
-                    document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(a.href);
-                    if (i < blobs.length - 1) await new Promise(r => setTimeout(r, 1500));
-                }
-                statusIndicator.innerText = "下载完成"; statusIndicator.classList.remove('status-saving'); statusIndicator.classList.add('status-saved');
+            // V103 Modification: Removed navigator.share logic entirely.
+            // Direct download flow:
+            statusIndicator.innerText = "开始下载...";
+            for (let i = 0; i < blobs.length; i++) {
+                statusIndicator.innerText = `下载中 ${i+1}/${blobs.length}`;
+                const a = document.createElement('a'); a.href = URL.createObjectURL(blobs[i]); a.download = `spark_slice_${i + 1}.png`;
+                document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(a.href);
+                if (i < blobs.length - 1) await new Promise(r => setTimeout(r, 1500));
             }
+            statusIndicator.innerText = "下载完成"; statusIndicator.classList.remove('status-saving'); statusIndicator.classList.add('status-saved');
+            
             setTimeout(() => statusIndicator.classList.remove('visible'), 2000);
             canvas.setViewportTransform(originalVpt); canvas.setWidth(originalWidth); canvas.setHeight(originalHeight);
             gridLines.forEach(l => l.visible = true); updateWorkspace(); canvas.requestRenderAll();
