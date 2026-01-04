@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Spark Canvas - V102 (焦点跟随+惯性滑动)</title>
+    <title>Spark Canvas - V102 (焦点跟随+惯性+阻尼回弹)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
     <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
     
@@ -534,6 +534,44 @@
             }
         }
 
+        // New Helper: Calculate Canvas Bounds (Center of First Page to Center of Last Page)
+        function getCanvasBounds() {
+            const winW = window.innerWidth;
+            const zoom = canvas.getZoom();
+            // Bound Left: When Page 0 is centered
+            const maxLeft = (winW / 2) - (SCREEN_WIDTH * zoom / 2);
+            // Bound Right: When Last Page is centered
+            const minLeft = (winW / 2) - ((screenCount * SCREEN_WIDTH - SCREEN_WIDTH/2) * zoom);
+            return { min: minLeft, max: maxLeft };
+        }
+
+        // New Helper: Snap Back Animation
+        function snapBack() {
+            const bounds = getCanvasBounds();
+            const currentX = canvas.viewportTransform[4];
+            let targetX = currentX;
+
+            if (currentX > bounds.max) targetX = bounds.max;
+            else if (currentX < bounds.min) targetX = bounds.min;
+            else return; // Inside bounds, no snap needed
+
+            fabric.util.animate({
+                startValue: currentX,
+                endValue: targetX,
+                duration: 400,
+                easing: fabric.util.ease.easeOutQuart,
+                onChange: function(value) {
+                    canvas.viewportTransform[4] = value;
+                    canvas.requestRenderAll();
+                    updateSideBarPosition();
+                },
+                onComplete: function() {
+                     canvas.setViewportTransform(canvas.viewportTransform);
+                     updateHitRegions();
+                }
+            });
+        }
+
         canvas.on('mouse:down', function(opt) {
             const evt = opt.e;
             const target = opt.target;
@@ -626,8 +664,7 @@
                 let deltaX = pos.x - lastX;
                 let deltaY = pos.y - lastY;
 
-                // Momentum: Calculate velocity (pixels per ms)
-                // Use a low-pass filter to smooth out velocity (0.2 current + 0.8 old)
+                // Momentum: Calculate velocity
                 if (dt > 0) {
                     const newVx = deltaX / dt;
                     const newVy = deltaY / dt;
@@ -645,11 +682,31 @@
                 
                 if (visualHeight <= availableHeight) {
                     deltaY = 0; 
-                    velocityY = 0; // also kill vertical momentum
+                    velocityY = 0; 
                 }
 
+                // --- V102-RubberBand: Damping Logic ---
+                const bounds = getCanvasBounds();
+                const currentX = canvas.viewportTransform[4];
+                const proposedX = currentX + deltaX;
+
+                if (proposedX > bounds.max) {
+                     // Dragging Right (Past Page 0)
+                     const overage = proposedX - bounds.max;
+                     // Damping formula: Resistance increases as you pull further
+                     // resistance = 1 / (1 + distance * factor)
+                     const resistance = 1 / (1 + Math.abs(overage) * 0.003); 
+                     deltaX *= resistance;
+                } else if (proposedX < bounds.min) {
+                     // Dragging Left (Past Last Page)
+                     const overage = bounds.min - proposedX;
+                     const resistance = 1 / (1 + Math.abs(overage) * 0.003);
+                     deltaX *= resistance;
+                }
+                // --------------------------------------
+
                 canvas.relativePan({ x: deltaX, y: deltaY });
-                updateSideBarPosition(); // V101: Move sidebar
+                updateSideBarPosition();
                 
                 lastX = pos.x;
                 lastY = pos.y;
@@ -674,28 +731,37 @@
                 }
             }
 
-            // Momentum: Trigger Glide on Release
             if (isDraggingCanvas) {
                 const timeSinceLastMove = Date.now() - lastMoveTime;
-                // If user held still for > 100ms before releasing, kill momentum
                 if (timeSinceLastMove > 100) {
                     velocityX = 0;
                     velocityY = 0;
                 }
-                applyMomentum();
+                
+                // --- V102-RubberBand: Check for SnapBack immediately ---
+                const bounds = getCanvasBounds();
+                const currentX = canvas.viewportTransform[4];
+                
+                if (currentX > bounds.max || currentX < bounds.min) {
+                    // Reset velocity to avoid conflicting forces and snap back
+                    velocityX = 0; velocityY = 0;
+                    snapBack();
+                } else {
+                    applyMomentum();
+                }
+                // ----------------------------------------------------
             }
 
             isDraggingCanvas = false;
             isObjectMoving = false;
             clearTimeout(longPressTimer);
             canvas.setViewportTransform(canvas.viewportTransform); 
-            // V101 Fix: Removed initViewport here to stop reset
-            updateSideBarPosition(); // Just update buttons
+            updateSideBarPosition();
             updateHitRegions(); 
         });
 
         function applyMomentum() {
-            const friction = 0.95; // 0.90 to 0.99 (Lower = stops faster)
+            const friction = 0.95; 
             const stopThreshold = 0.01;
 
             function step() {
@@ -707,15 +773,29 @@
                 velocityX *= friction;
                 velocityY *= friction;
 
-                let panX = velocityX * 16; // Approx 16ms per frame
+                let panX = velocityX * 16; 
                 let panY = velocityY * 16;
 
-                // Enforce V102 Vertical Constraints
                 const visualHeight = SCREEN_HEIGHT * canvas.getZoom();
                 const availableHeight = window.innerHeight - (document.querySelector('.bottom-bar').offsetHeight + 30);
                 if (visualHeight <= availableHeight) {
                     panY = 0;
                 }
+
+                // --- V102-RubberBand: Momentum Boundary Check ---
+                // If momentum carries us out of bounds, stop and snap back
+                const bounds = getCanvasBounds();
+                const currentX = canvas.viewportTransform[4];
+                const proposedX = currentX + panX;
+
+                if (proposedX > bounds.max || proposedX < bounds.min) {
+                    // Option: We could simulate a "bounce" here by reversing velocity, 
+                    // but for web-like feel, stopping and snapping is cleaner.
+                    cancelAnimationFrame(momentumID);
+                    snapBack();
+                    return;
+                }
+                // ------------------------------------------------
 
                 canvas.relativePan({ x: panX, y: panY });
                 updateSideBarPosition();
