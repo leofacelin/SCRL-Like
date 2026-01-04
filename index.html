@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Spark Canvas - V103 (物理引擎版)</title>
+    <title>Spark Canvas - V104 (原生级滚动)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
     <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
     
@@ -46,6 +46,7 @@
             top: 50%; transform: translateY(-50%);
             display: flex; flex-direction: column; gap: 12px;
             z-index: 90;
+            transition: left 0.1s ease-out; /* Slight transition for smoother follow */
         }
         .side-btn {
             width: 44px; height: 44px; border-radius: 50%;
@@ -429,7 +430,6 @@
             sideBar.style.left = (contentRightEdge + 15) + 'px'; 
         }
 
-        // V102: Focus on specific page index (Center Align)
         function focusOnPage(index) {
             const winW = window.innerWidth;
             const winH = window.innerHeight;
@@ -442,11 +442,27 @@
             const targetY = visualSpaceCenterY - contentHalfHeight + 20;
 
             const vpt = canvas.viewportTransform;
-            vpt[4] = (winW / 2) - ((index * SCREEN_WIDTH + SCREEN_WIDTH / 2) * zoom);
-            vpt[5] = targetY;
-
-            canvas.requestRenderAll();
-            updateSideBarPosition();
+            
+            // Current Center Target
+            const targetX = (winW / 2) - ((index * SCREEN_WIDTH + SCREEN_WIDTH / 2) * zoom);
+            
+            // Animate Pan
+            fabric.util.animate({
+                startValue: vpt[4],
+                endValue: targetX,
+                duration: 400,
+                onChange: function(value) {
+                    vpt[4] = value;
+                    vpt[5] = targetY; // Ensure vertical center
+                    canvas.requestRenderAll();
+                    updateSideBarPosition();
+                },
+                onComplete: function() {
+                    canvas.setViewportTransform(vpt);
+                    updateHitRegions();
+                },
+                easing: fabric.util.ease.easeOutQuart
+            });
         }
 
         function initViewport() {
@@ -470,8 +486,17 @@
             if (zoom < 0.1) zoom = 0.1;
             canvas.setZoom(zoom);
 
-            focusOnPage(0);
+            // Center initial page
+            const vpt = canvas.viewportTransform;
+            vpt[4] = (winW - SCREEN_WIDTH * zoom) / 2;
+            
+            const visualSpaceCenterY = (winH - toolbarHeight) / 2;
+            const contentHalfHeight = (SCREEN_HEIGHT * zoom) / 2;
+            vpt[5] = visualSpaceCenterY - contentHalfHeight + 20; 
+            
             updateHitRegions(); 
+            canvas.requestRenderAll();
+            updateSideBarPosition(); 
         }
         
         function updateHitRegions() {
@@ -491,13 +516,12 @@
         let lastX, lastY;
         let mouseDownPoint = {x:0, y:0};
         let mouseDownTarget = null; 
-
-        // V103: Physics Variables
-        let velocity = { x: 0, y: 0 };
+        
+        // V104: Enhanced Physics Variables
+        let velocity = { x: 0 };
         let lastTime = 0;
         let animationFrame;
         const FRICTION = 0.95;
-        const SNAP_THRESHOLD = 0.1;
 
         function getClientPos(e) {
             if (e.touches && e.touches.length > 0) {
@@ -525,39 +549,13 @@
             }
         }
 
-        // V103: Physics Animation Loop
-        function animateMomentum() {
-            velocity.x *= FRICTION;
-            velocity.y *= FRICTION;
-
-            canvas.relativePan(new fabric.Point(velocity.x, velocity.y));
-            updateSideBarPosition();
-
-            if (Math.abs(velocity.x) > SNAP_THRESHOLD || Math.abs(velocity.y) > SNAP_THRESHOLD) {
-                animationFrame = requestAnimationFrame(animateMomentum);
-            } else {
-                checkSnapback();
-            }
-        }
-
-        function checkSnapback() {
-            const vpt = canvas.viewportTransform;
-            const zoom = canvas.getZoom();
-            const contentWidth = screenCount * SCREEN_WIDTH * zoom;
-            
-            // Simplified bounds check (Left Edge > 0 is bad, Right Edge < ScreenWidth is bad if content is wide)
-            // But for now, we rely on the visual damping during drag to guide user.
-            // Full snapback logic needs complex boundary calcs. 
-            // For V103, we focus on Inertia stopping cleanly.
-        }
-
         canvas.on('mouse:down', function(opt) {
             const evt = opt.e;
             const target = opt.target;
 
-            // Stop any running physics
+            // Stop physics
             cancelAnimationFrame(animationFrame);
-            velocity = { x: 0, y: 0 };
+            velocity = { x: 0 };
 
             if (addPopover.classList.contains('active')) {
                 toggleAddMenu(false);
@@ -573,7 +571,7 @@
 
             const pos = getClientPos(evt);
             lastX = pos.x; lastY = pos.y;
-            lastTime = Date.now(); // Reset time for velocity calc
+            lastTime = Date.now();
             mouseDownPoint = { x: pos.x, y: pos.y };
 
             if (contextMenu.style.display === 'block' && opt.button !== 3) {
@@ -638,44 +636,35 @@
                 if (pos.x === undefined || pos.y === undefined) return;
                 
                 let deltaX = pos.x - lastX;
-                let deltaY = pos.y - lastY;
                 
-                // V103: Velocity Calculation
+                // V104: Velocity Tracking
                 const now = Date.now();
                 const dt = now - lastTime;
                 if (dt > 0) {
-                    velocity.x = deltaX * 0.8; // Simple momentum factor
-                    velocity.y = deltaY * 0.8;
+                    velocity.x = deltaX; // Pure distance per frame roughly
                     lastTime = now;
                 }
 
-                if (Math.abs(deltaX) > 2 || Math.abs(deltaY) > 2) {
+                if (Math.abs(deltaX) > 2) {
                     clearTimeout(longPressTimer);
                 }
 
-                // V103: Damping Logic (Check Boundaries)
+                // V104: Horizontal Boundary Damping
                 const vpt = canvas.viewportTransform;
                 const zoom = canvas.getZoom();
                 const contentWidth = screenCount * SCREEN_WIDTH * zoom;
-                const minX = canvas.width - contentWidth - 100; // 100px buffer
+                const minX = canvas.width - contentWidth - 100; 
                 
-                // Apply damping if out of bounds (Rubber band effect)
+                // Apply rubber band resistance if out of bounds
                 if (vpt[4] > 100 || vpt[4] < minX) {
-                    deltaX *= 0.3; // Heavy resistance
+                    deltaX /= 3; // Strong damping
                 }
 
-                const visualHeight = SCREEN_HEIGHT * canvas.getZoom();
-                const availableHeight = window.innerHeight - (document.querySelector('.bottom-bar').offsetHeight + 30);
-                
-                if (visualHeight <= availableHeight) {
-                    deltaY = 0; 
-                }
-
-                canvas.relativePan({ x: deltaX, y: deltaY });
+                // V104: Lock Y Axis (Zero deltaY)
+                canvas.relativePan({ x: deltaX, y: 0 });
                 updateSideBarPosition();
                 
                 lastX = pos.x;
-                lastY = pos.y;
             } else {
                 const active = canvas.getActiveObject();
                 if (active && (active.isMoving || active.isScaling || active.isRotating)) {
@@ -687,9 +676,9 @@
 
         canvas.on('mouse:up', function(opt) {
             const evt = opt.e;
-            const pos = getClientPos(evt);
             
             if (isDraggingCanvas && mouseDownTarget && mouseDownTarget.lockMovementX) {
+                const pos = getClientPos(evt);
                 const dist = Math.sqrt(Math.pow(pos.x - mouseDownPoint.x, 2) + Math.pow(pos.y - mouseDownPoint.y, 2));
                 if (dist < 5) { 
                     canvas.setActiveObject(mouseDownTarget);
@@ -697,14 +686,33 @@
                 }
             }
 
-            // V103: Start Momentum on release
+            // V104: Snapback Logic
             if (isDraggingCanvas) {
-                // Only trigger momentum if velocity is significant
-                if (Math.abs(velocity.x) > 1 || Math.abs(velocity.y) > 1) {
-                    animateMomentum();
-                } else {
-                    checkSnapback(); // Or just snap back if static
+                const vpt = canvas.viewportTransform;
+                const zoom = canvas.getZoom();
+                const winW = window.innerWidth;
+                const pageWidth = SCREEN_WIDTH * zoom;
+                
+                // Calculate current "Scroll" position relative to center
+                // vpt[4] is the left edge. Center is vpt[4] + contentWidth/2
+                // We want to find which page center is closest to screen center (winW/2)
+                
+                // Offset of the first page's left edge from screen center
+                const offset = (winW / 2) - vpt[4] - (pageWidth / 2);
+                let targetIndex = Math.round(offset / pageWidth);
+                
+                // Momentum Influence: If flicked, modify target index
+                if (Math.abs(velocity.x) > 15) { // Threshold
+                    if (velocity.x < 0) targetIndex++; // Swipe Left -> Next
+                    else targetIndex--; // Swipe Right -> Prev
                 }
+                
+                // Clamp index
+                if (targetIndex < 0) targetIndex = 0;
+                if (targetIndex >= screenCount) targetIndex = screenCount - 1;
+                
+                // Execute Snap
+                focusOnPage(targetIndex);
             }
 
             isDraggingCanvas = false;
