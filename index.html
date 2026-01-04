@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Spark Canvas - V101 (修复版)</title>
+    <title>Spark Canvas - V102 (焦点跟随版)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
     <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
     
@@ -41,14 +41,12 @@
         .canvas-container { margin: 0 auto; background: transparent !important; }
         canvas { background: transparent !important; }
 
-        /* --- V101: Side Bar (Fixed positioning logic) --- */
+        /* Side Bar (Fixed positioning logic) */
         .side-bar {
             position: fixed; 
-            /* left set by JS */
             top: 50%; transform: translateY(-50%);
             display: flex; flex-direction: column; gap: 12px;
             z-index: 90;
-            /* Remove transition to make it stick perfectly during drag */
         }
         .side-btn {
             width: 44px; height: 44px; border-radius: 50%;
@@ -62,7 +60,7 @@
         .side-btn:active { transform: scale(0.95); }
         .side-btn i { pointer-events: none; }
 
-        /* --- Bottom Bar --- */
+        /* Bottom Bar */
         .bottom-bar {
             position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
             display: flex; gap: 40px; align-items: center;
@@ -110,7 +108,7 @@
         .pop-item:hover { background: rgba(255,255,255,0.1); color: #fff; }
         .pop-item i { font-size: 18px; }
 
-        /* --- Panels --- */
+        /* Panels */
         #bg-panel { display: none; position: absolute; bottom: 100px; left: 50%; transform: translateX(-50%); background: rgba(30, 30, 30, 0.95); backdrop-filter: blur(20px); border: 1px solid #444; border-radius: 16px; padding: 15px; box-shadow: 0 10px 40px rgba(0,0,0,0.8); z-index: 90; animation: panelUp 0.2s; width: 240px; }
         @keyframes panelUp { from { opacity: 0; transform: translate(-50%, 20px); } to { opacity: 1; transform: translate(-50%, 0); } }
         .panel-title { font-size: 12px; color: #888; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 1px; text-align: center; }
@@ -152,7 +150,7 @@
         .control-btn:hover { background: #555; color: white; }
         .control-btn:active { transform: scale(0.9); }
 
-        /* V101: Independent Font List Popup */
+        /* Font List Popup */
         .font-selector-row { display: none; padding: 2px; margin-bottom: 4px; }
         .font-toggle-btn {
             display: flex; justify-content: space-between; align-items: center;
@@ -162,15 +160,14 @@
         }
         .font-toggle-btn:hover { background: rgba(255,255,255,0.1); color: white; }
         
-        /* New Detached Font Menu */
         .font-options-list {
             display: none; flex-direction: column; gap: 4px;
-            position: absolute; left: 105%; top: 120px; /* Positioned to the right of context menu */
+            position: absolute; left: 105%; top: 120px; 
             background: rgba(40, 40, 40, 0.98); backdrop-filter: blur(20px);
             border: 1px solid #555; border-radius: 12px;
             padding: 6px; min-width: 100px;
             box-shadow: 0 10px 40px rgba(0,0,0,0.8);
-            z-index: 2001; /* Above context menu */
+            z-index: 2001; 
         }
         .font-options-list.active { display: flex; }
         
@@ -429,14 +426,36 @@
             isInternalUpdate = false;
         }
 
-        // V101: Separate Update Sidebar logic
         function updateSideBarPosition() {
             const vpt = canvas.viewportTransform;
             if(!vpt) return;
             const zoom = canvas.getZoom();
-            // Calculate visual right edge of the content
             const contentRightEdge = vpt[4] + (screenCount * SCREEN_WIDTH * zoom);
             sideBar.style.left = (contentRightEdge + 15) + 'px'; 
+        }
+
+        // V102: Focus on specific page index (Center Align)
+        function focusOnPage(index) {
+            const winW = window.innerWidth;
+            const winH = window.innerHeight;
+            const zoom = canvas.getZoom();
+            
+            // Calculate Vertical Center (Safety Area above toolbar)
+            const toolbar = document.querySelector('.bottom-bar');
+            const toolbarHeight = toolbar ? toolbar.offsetHeight + 50 : 100;
+            const visualSpaceCenterY = (winH - toolbarHeight) / 2;
+            const contentHalfHeight = (SCREEN_HEIGHT * zoom) / 2;
+            const targetY = visualSpaceCenterY - contentHalfHeight + 20;
+
+            // Calculate Horizontal Center for specific page
+            // Center of Page i = (index * Width) + (Width / 2)
+            // We want that center to be at WindowWidth / 2
+            const vpt = canvas.viewportTransform;
+            vpt[4] = (winW / 2) - ((index * SCREEN_WIDTH + SCREEN_WIDTH / 2) * zoom);
+            vpt[5] = targetY;
+
+            canvas.requestRenderAll();
+            updateSideBarPosition();
         }
 
         function initViewport() {
@@ -460,17 +479,10 @@
             if (zoom < 0.1) zoom = 0.1;
             canvas.setZoom(zoom);
 
-            const vpt = canvas.viewportTransform;
-            vpt[4] = (winW - SCREEN_WIDTH * zoom) / 2;
-            
-            const visualSpaceCenterY = (winH - toolbarHeight) / 2;
-            const contentHalfHeight = (SCREEN_HEIGHT * zoom) / 2;
-            
-            vpt[5] = visualSpaceCenterY - contentHalfHeight + 20; 
+            // Initial focus on first page (or could track current page)
+            focusOnPage(0);
             
             updateHitRegions(); 
-            canvas.requestRenderAll();
-            updateSideBarPosition(); // Initial update
         }
         
         function updateHitRegions() {
@@ -613,7 +625,7 @@
                 }
 
                 canvas.relativePan({ x: deltaX, y: deltaY });
-                updateSideBarPosition(); // V101: Move sidebar with canvas dragging
+                updateSideBarPosition(); // V101: Move sidebar
                 
                 lastX = pos.x;
                 lastY = pos.y;
@@ -642,7 +654,8 @@
             isObjectMoving = false;
             clearTimeout(longPressTimer);
             canvas.setViewportTransform(canvas.viewportTransform); 
-            // V101 Fix: REMOVED initViewport() call from here!
+            // V101 Fix: Removed initViewport here to stop reset
+            updateSideBarPosition(); // Just update buttons
             updateHitRegions(); 
         });
 
@@ -913,12 +926,14 @@
             triggerAutoSave();
         }
 
+        // V102: Focus on Page Functionality
         function addScreen() { 
             screenCount++; 
             updateWorkspace(); 
             canvas.requestRenderAll(); 
             triggerAutoSave(); 
-            updateSideBarPosition();
+            // Focus on the new page (index = count - 1)
+            focusOnPage(screenCount - 1);
         }
         function removeScreen() { 
             if (screenCount > 1) { 
@@ -926,7 +941,8 @@
                 updateWorkspace(); 
                 canvas.requestRenderAll(); 
                 triggerAutoSave(); 
-                updateSideBarPosition();
+                // Focus on the last remaining page
+                focusOnPage(screenCount - 1);
             } 
         }
 
