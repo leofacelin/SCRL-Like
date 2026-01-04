@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Spark Canvas - V108 (清空按钮动态对齐版)</title>
+    <title>Spark Canvas - V109 (辅助线对齐修复版)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
     <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
     
@@ -52,10 +52,8 @@
         /* V108: Side Bar Bottom (Dynamic Positioning) */
         .side-bar-bottom {
             position: fixed;
-            /* bottom: 30px;  REMOVED in V108 */
             display: flex; flex-direction: column; gap: 12px;
             z-index: 90;
-            /* Position will be set by JS */
         }
 
         .side-btn {
@@ -1227,12 +1225,21 @@
             canvas.requestRenderAll(); 
         });
 
-        // V105 Optimization: Direct Draw on Context
+        // V109 Fix: Correct transform for Retina/High-DPI screens
         canvas.on('after:render', function(opt) {
             if(renderingLines.length === 0) return;
             const ctx = canvas.getContext();
             ctx.save();
-            ctx.setTransform(canvas.viewportTransform[0], canvas.viewportTransform[1], canvas.viewportTransform[2], canvas.viewportTransform[3], canvas.viewportTransform[4], canvas.viewportTransform[5]);
+            const vpt = canvas.viewportTransform;
+            const retina = canvas.getRetinaScaling();
+            ctx.setTransform(
+                vpt[0] * retina, 
+                vpt[1] * retina, 
+                vpt[2] * retina, 
+                vpt[3] * retina, 
+                vpt[4] * retina, 
+                vpt[5] * retina
+            );
             ctx.lineWidth = 1;
             ctx.strokeStyle = '#ff0077';
             ctx.setLineDash([4, 4]);
