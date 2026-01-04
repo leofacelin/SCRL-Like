@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Spark Canvas - V124 (漫游交互重构版)</title>
+    <title>Spark Canvas - V125 (漫游交互与固定菜单版)</title>
     
     <script src="https://cdn.staticfile.org/fabric.js/5.3.1/fabric.min.js"></script>
     
@@ -15,12 +15,10 @@
     <style>
         :root { 
             --bg-color: #121212; 
-            /* Advanced Glass Variables */
             --glass-bg: rgba(30, 30, 30, 0.65); 
             --glass-border: rgba(255, 255, 255, 0.1);
             --glass-highlight: rgba(255, 255, 255, 0.05);
             --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-            
             --accent-color: #0A84FF; 
             --danger-color: #FF453A; 
             --text-main: #FFFFFF;
@@ -52,7 +50,7 @@
         .canvas-container { margin: 0 auto; background: transparent !important; }
         canvas { background: transparent !important; }
 
-        /* --- Glassmorphism Base --- */
+        /* Glass Base */
         .glass-panel {
             background: var(--glass-bg);
             backdrop-filter: blur(24px) saturate(180%);
@@ -71,131 +69,89 @@
             box-sizing: border-box;
             border-radius: 20px; 
             padding: 6px; 
-            display: flex; 
-            flex-direction: column; 
-            gap: 8px;
+            display: flex; flex-direction: column; gap: 8px;
             z-index: 90;
         }
 
-        /* Side Bar Positioning */
-        .side-bar {
-            position: fixed; top: 50%; transform: translateY(-50%);
-            transition: left 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-        }
-
-        .side-bar-bottom {
-            position: fixed; 
-            transition: left 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), top 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-        }
+        .side-bar { position: fixed; top: 50%; transform: translateY(-50%); transition: left 0.3s; }
+        .side-bar-bottom { position: fixed; transition: left 0.3s, top 0.3s; }
 
         .side-btn {
-            width: 44px; height: 44px; 
-            border-radius: 14px; 
+            width: 44px; height: 44px; border-radius: 14px; 
             display: flex; align-items: center; justify-content: center;
-            font-size: 20px; color: var(--text-sub);
-            cursor: pointer; 
-            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
-            border: 1px solid transparent;
+            font-size: 20px; color: var(--text-sub); cursor: pointer; 
+            transition: all 0.3s; border: 1px solid transparent;
         }
-        
-        .side-btn:hover { 
-            color: var(--text-main); 
-            background: var(--glass-highlight);
-            transform: translateY(-2px); 
-            border-color: rgba(255,255,255,0.1);
-        }
+        .side-btn:hover { color: var(--text-main); background: var(--glass-highlight); transform: translateY(-2px); border-color: rgba(255,255,255,0.1); }
         .side-btn:active { transform: scale(0.92); }
-
         .side-btn.danger { color: #666; }
         .side-btn.danger:hover { background: rgba(255, 69, 58, 0.15); color: var(--danger-color); border-color: var(--danger-color); }
 
-        /* Bottom Floating Dock */
         .bottom-dock-container {
             position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
-            padding: 8px 12px;
-            border-radius: 24px;
+            padding: 8px 12px; border-radius: 24px;
             display: flex; align-items: center; gap: 8px;
             z-index: 100;
             padding-bottom: calc(8px + env(safe-area-inset-bottom, 0));
             margin-bottom: env(safe-area-inset-bottom, 0);
+            transition: opacity 0.2s; /* Fade out when covered by menu */
         }
-
-        .dock-btn {
-            width: 48px; height: 48px;
-            border-radius: 14px; 
-            display: flex; align-items: center; justify-content: center;
-            font-size: 22px; color: var(--text-main);
-            cursor: pointer;
-            transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-            border: 1px solid transparent;
-        }
-
+        
+        .dock-btn { width: 48px; height: 48px; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 22px; color: var(--text-main); cursor: pointer; transition: all 0.3s; border: 1px solid transparent; }
         .dock-btn:hover { background: var(--glass-highlight); transform: translateY(-4px); }
         .dock-btn:active { transform: scale(0.92) translateY(-2px); }
-
-        .dock-btn.hero {
-            background: var(--accent-color);
-            color: white;
-            box-shadow: 0 4px 15px rgba(10, 132, 255, 0.4);
-        }
-        .dock-btn.hero:hover {
-            box-shadow: 0 8px 20px rgba(10, 132, 255, 0.6);
-            transform: translateY(-5px) scale(1.05);
-        }
-        
+        .dock-btn.hero { background: var(--accent-color); color: white; box-shadow: 0 4px 15px rgba(10, 132, 255, 0.4); }
+        .dock-btn.hero:hover { box-shadow: 0 8px 20px rgba(10, 132, 255, 0.6); transform: translateY(-5px) scale(1.05); }
         .dock-divider { width: 1px; height: 24px; background: rgba(255,255,255,0.1); margin: 0 4px; }
 
-
-        /* Add Popover Menu */
-        #add-popover {
-            position: absolute; bottom: 85px; left: 50%; transform: translateX(-50%) scale(0.9);
-            border-radius: 18px; padding: 6px;
-            display: flex; flex-direction: column; gap: 4px;
-            opacity: 0; pointer-events: none; 
-            transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-            transform-origin: bottom center;
-            width: 130px;
-        }
+        #add-popover { position: absolute; bottom: 85px; left: 50%; transform: translateX(-50%) scale(0.9); border-radius: 18px; padding: 6px; display: flex; flex-direction: column; gap: 4px; opacity: 0; pointer-events: none; transition: all 0.3s; transform-origin: bottom center; width: 130px; }
         #add-popover.active { opacity: 1; pointer-events: auto; transform: translateX(-50%) scale(1); }
-        
-        .pop-item {
-            display: flex; align-items: center; gap: 12px;
-            padding: 12px 14px; border-radius: 12px;
-            color: #ddd; cursor: pointer; transition: all 0.2s;
-            font-size: 14px; font-weight: 500;
-        }
+        .pop-item { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 12px; color: #ddd; cursor: pointer; transition: all 0.2s; font-size: 14px; font-weight: 500; }
         .pop-item:hover { background: rgba(255,255,255,0.1); color: #fff; }
         .pop-item i { font-size: 20px; color: var(--accent-color); }
 
-
-        /* Panels (BG & Fonts) */
-        #bg-panel { 
-            display: none; position: absolute; bottom: 100px; left: 50%; transform: translateX(-50%); 
-            border-radius: 20px; padding: 20px; 
-            z-index: 90; animation: panelUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); width: 260px; 
-        }
+        #bg-panel { display: none; position: absolute; bottom: 100px; left: 50%; transform: translateX(-50%); border-radius: 20px; padding: 20px; z-index: 90; animation: panelUp 0.3s; width: 260px; }
         @keyframes panelUp { from { opacity: 0; transform: translate(-50%, 20px) scale(0.95); } to { opacity: 1; transform: translate(-50%, 0) scale(1); } }
-        
         .panel-title { font-size: 11px; color: #666; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 1px; text-align: center; font-weight: 700; }
         .bg-options { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
         .bg-option { width: 52px; height: 52px; border-radius: 14px; border: 2px solid #444; cursor: pointer; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; background-size: cover; background-position: center; transition: all 0.2s; }
         .bg-option:hover { border-color: #fff; transform: scale(1.05); }
         .bg-option.add-btn { border: 2px dashed #555; color: #555; font-size: 24px; }
         .bg-option.add-btn:hover { border-color: #888; color: #888; }
-        
         .bg-preset-grid { width: 52px; height: 52px; display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr); gap: 4px; padding: 4px; background: rgba(255,255,255,0.05); border-radius: 14px; box-sizing: border-box; }
         .preset-dot { width: 100%; height: 100%; border-radius: 4px; cursor: pointer; border: 1px solid rgba(255,255,255,0.1); transition: transform 0.2s; }
         .preset-dot:hover { transform: scale(1.2); border-color: white; z-index: 2; }
 
-
-        /* Context Menu */
+        /* --- Context Menu V125: Fixed on Mobile --- */
         #context-menu { 
             display: none; position: absolute; z-index: 2000; width: 170px; 
             border-radius: 16px; padding: 6px; 
-            animation: menuFadeIn 0.2s cubic-bezier(0.25, 0.8, 0.25, 1); 
+            animation: menuFadeIn 0.2s; 
         }
         @keyframes menuFadeIn { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
         
+        /* Mobile/Small Screen Overrides for Menu */
+        @media (max-width: 600px) {
+            #context-menu {
+                position: fixed !important;
+                left: 50% !important;
+                bottom: 30px !important;
+                top: auto !important;
+                transform: translateX(-50%) !important;
+                width: 90% !important;
+                max-width: 360px;
+                animation: slideUp 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+                box-shadow: 0 -10px 40px rgba(0,0,0,0.5);
+                border: 1px solid var(--glass-border);
+            }
+            @keyframes slideUp { from { opacity: 0; transform: translate(-50%, 20px); } to { opacity: 1; transform: translate(-50%, 0); } }
+            
+            /* Hide Dock when menu is open on mobile */
+            body.menu-open .bottom-dock-container {
+                opacity: 0; pointer-events: none;
+            }
+        }
+
         .menu-header { font-size: 10px; color: #666; padding: 4px 8px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 2px; font-weight: 700; display: none; }
         .layer-controls { display: flex; justify-content: space-between; background: rgba(255,255,255,0.05); border-radius: 10px; padding: 4px; margin-bottom: 6px; }
         .layer-btn { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: 8px; cursor: pointer; font-size: 18px; color: #ccc; transition: background 0.2s; }
@@ -232,6 +188,16 @@
              border-radius: 14px; padding: 6px; min-width: 110px;
              z-index: 2001;
         }
+        /* Mobile Font List Adjustments */
+        @media (max-width: 600px) {
+            .font-options-list {
+                position: static !important;
+                left: auto !important; top: auto !important;
+                width: 100%; box-sizing: border-box;
+                background: rgba(0,0,0,0.2);
+                margin-top: 10px;
+            }
+        }
         .font-options-list.active { display: flex; }
         .font-option { padding: 10px 14px; font-size: 14px; color: #ccc; cursor: pointer; border-radius: 8px; text-align: left; white-space: nowrap; transition: background 0.2s; }
         .font-option:hover { background: var(--accent-color); color: white; }
@@ -239,27 +205,12 @@
         .show-always { display: flex !important; }
         .show-header { display: block !important; }
 
-        /* Modals */
         #confirm-modal, #info-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); backdrop-filter: blur(8px); z-index: 3000; animation: fadeIn 0.3s; }
-        .modal-box { 
-            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
-            background: #222; border: 1px solid #444; 
-            border-radius: 16px; padding: 15px; 
-            width: 240px; max-width: 85%; 
-            text-align: center; 
-            box-shadow: 0 25px 60px rgba(0,0,0,0.6); 
-            animation: popIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-        }
-        @keyframes popIn { from { opacity: 0; transform: translate(-50%, -40%) scale(0.9); } to { opacity: 1; transform: translate(-50%, -50%) scale(1); } }
-
-        .modal-title { font-size: 18px; font-weight: 700; margin-bottom: 12px; color: white; letter-spacing: 0.5px; }
-        .modal-desc { font-size: 14px; color: #999; margin-bottom: 24px; line-height: 1.5; }
-        .modal-actions { display: flex; gap: 12px; justify-content: center; }
-        .modal-btn { 
-            flex: 1; padding: 12px; border-radius: 10px; 
-            cursor: pointer; border: none; font-size: 14px; font-weight: 600; 
-            transition: transform 0.1s; 
-        }
+        .modal-box { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #2c2c2c; border: 1px solid #555; border-radius: 16px; padding: 15px; width: 240px; max-width: 85%; text-align: center; box-shadow: 0 20px 50px rgba(0,0,0,0.5); }
+        .modal-title { font-size: 18px; font-weight: 700; margin-bottom: 10px; color: white; letter-spacing: 0.5px; }
+        .modal-desc { font-size: 14px; color: #999; margin-bottom: 20px; line-height: 1.5; }
+        .modal-actions { display: flex; gap: 10px; justify-content: center; }
+        .modal-btn { flex: 1; padding: 10px; border-radius: 8px; cursor: pointer; border: none; font-size: 14px; font-weight: 600; transition: transform 0.1s; }
         .modal-btn:active { transform: scale(0.95); }
         .modal-btn.cancel { background: #3a3a3c; color: #fff; }
         .modal-btn.cancel:hover { background: #48484a; }
@@ -268,9 +219,8 @@
         .modal-btn.primary { background: var(--accent-color); color: white; }
         .modal-btn.primary:hover { background: #0062cc; }
 
-        /* Info List */
         .info-list { text-align: left; font-size: 14px; color: #bbb; margin-bottom: 25px; padding: 0 5px; }
-        .info-item { display: flex; align-items: center; gap: 16px; margin-bottom: 16px; }
+        .info-item { display: flex; align-items: center; gap: 16px; margin-bottom: 15px; }
         .info-icon { font-size: 32px; width: 32px; text-align: center; color: var(--accent-color); flex-shrink: 0; }
         
         #file-input, #bg-file-input { display: none; }
@@ -433,6 +383,8 @@
         fabric.textureSize = 2048; 
 
         let layoutState = { visualHeight: 0, availableHeight: 0 };
+        // V125: Implicit lock helper
+        let tempLockedObject = null;
 
         const rotateIconImg = new Image();
         rotateIconImg.src = 'rotate.png';
@@ -605,7 +557,6 @@
         let mouseDownPoint = {x:0, y:0};
         let mouseDownTarget = null; 
 
-        // Momentum Variables
         let velocityX = 0, velocityY = 0;
         let lastMoveTime = 0;
         let momentumID = null;
@@ -670,6 +621,7 @@
             });
         }
 
+        // V125: Enhanced Mouse Down Logic for Implicit Locking
         canvas.on('mouse:down', function(opt) {
             const evt = opt.e;
             const target = opt.target;
@@ -690,40 +642,50 @@
             lastX = pos.x; lastY = pos.y;
             mouseDownPoint = { x: pos.x, y: pos.y };
 
-            if (addPopover.classList.contains('active')) {
-                toggleAddMenu(false);
-            }
+            if (addPopover.classList.contains('active')) toggleAddMenu(false);
+            if (bgPanel.style.display === 'block') bgPanel.style.display = 'none';
             if (contextMenu.style.display === 'block') {
                  if (!target || target === bgRect) {
                      contextMenu.style.display = 'none';
                      document.getElementById('font-options-wrapper').classList.remove('active');
-                     document.getElementById('font-arrow-icon').className = "ri-arrow-right-s-line";
+                     document.body.classList.remove('menu-open');
                  }
             }
-            if (bgPanel.style.display === 'block') bgPanel.style.display = 'none';
 
             const activeObject = canvas.getActiveObject();
             
-            // Interaction Logic V124:
-            // 1. If hitting active object -> Drag it
-            if (target && target === activeObject) {
-                isDraggingCanvas = false;
-                return;
-            }
-
-            // 2. Otherwise -> Pan mode
-            isDraggingCanvas = true;
-            mouseDownTarget = target;
-            if(activeObject) {
+            // Interaction Logic V125: Implicit Lock Implementation
+            // If target exists but is NOT the currently active object, treat as PAN
+            if (target && target !== activeObject && target !== bgRect) {
+                isDraggingCanvas = true;
+                mouseDownTarget = target;
+                
+                // Force deselect everything visually
                 canvas.discardActiveObject(); 
                 canvas.requestRenderAll();
+                
+                // Temporarily lock drag for this interaction to prevent accidental move
+                target.lockMovementX = true;
+                target.lockMovementY = true;
+                tempLockedObject = target; 
+            } 
+            else if (!target || target === bgRect) {
+                // Background click
+                isDraggingCanvas = true;
+                mouseDownTarget = null;
+                canvas.discardActiveObject();
+                canvas.requestRenderAll();
+            } 
+            else {
+                // Target IS active object -> Allow Drag
+                isDraggingCanvas = false;
+                mouseDownTarget = target;
             }
 
             // Long press logic
             if (target && target !== bgRect && evt.type === 'touchstart') {
                 if (target.__corner) return;
                 longPressTimer = setTimeout(() => {
-                     // If we haven't moved much, open menu
                      if (Math.abs(lastX - getClientPos(evt).x) < 5) {
                         isDraggingCanvas = false;
                         canvas.setActiveObject(target);
@@ -796,14 +758,26 @@
             if (isDraggingCanvas) {
                 const dist = Math.sqrt(Math.pow(pos.x - mouseDownPoint.x, 2) + Math.pow(pos.y - mouseDownPoint.y, 2));
                 
-                // If it was a CLICK/TAP
+                // Click (Tap) Detection
                 if (dist < 5) {
-                    if (mouseDownTarget && mouseDownTarget !== bgRect) {
-                        canvas.setActiveObject(mouseDownTarget);
+                    // Unlock the temp locked object for selection
+                    if (tempLockedObject) {
+                        tempLockedObject.lockMovementX = false;
+                        tempLockedObject.lockMovementY = false;
+                        
+                        // Select it now!
+                        canvas.setActiveObject(tempLockedObject);
                         canvas.requestRenderAll();
+                        tempLockedObject = null;
                     }
                 } else {
-                    // It was a DRAG -> Momentum
+                    // Was dragging (panning). Keep it unselected/implicit locked.
+                    if (tempLockedObject) {
+                        tempLockedObject.lockMovementX = false;
+                        tempLockedObject.lockMovementY = false;
+                        tempLockedObject = null;
+                    }
+                    
                     const timeSinceLastMove = Date.now() - lastMoveTime;
                     if (timeSinceLastMove < 100) {
                         applyMomentum();
@@ -993,7 +967,7 @@
             if (!keepOpen.includes(action)) {
                 contextMenu.style.display = 'none';
                 document.getElementById('font-options-wrapper').classList.remove('active');
-                document.getElementById('font-arrow-icon').className = "ri-arrow-right-s-line";
+                document.body.classList.remove('menu-open');
             }
         }
 
@@ -1033,18 +1007,22 @@
             }
 
             contextMenu.style.display = 'block';
+            document.body.classList.add('menu-open'); // For hiding Dock on mobile
+
             const menuW = contextMenu.offsetWidth;
             const menuH = contextMenu.offsetHeight;
 
-            let left = clientX + 10;
-            let top = clientY - (menuH / 2);
-
-            if (left + menuW > window.innerWidth) left = clientX - menuW - 10;
-            if (top + menuH > window.innerHeight) top = window.innerHeight - menuH - 10;
-            if (top < 10) top = 10;
-
-            contextMenu.style.left = left + 'px';
-            contextMenu.style.top = top + 'px';
+            // Desktop Positioning logic
+            if (window.innerWidth > 600) {
+                let left = clientX + 10;
+                let top = clientY - (menuH / 2);
+                if (left + menuW > window.innerWidth) left = clientX - menuW - 10;
+                if (top + menuH > window.innerHeight) top = window.innerHeight - menuH - 10;
+                if (top < 10) top = 10;
+                contextMenu.style.left = left + 'px';
+                contextMenu.style.top = top + 'px';
+            }
+            
             bgPanel.style.display = 'none';
         }
 
