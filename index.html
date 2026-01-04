@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Spark Canvas - V128 (纯净Dock版)</title>
+    <title>Spark Canvas - V131 (UI细节修复版)</title>
     
     <script src="https://cdn.staticfile.org/fabric.js/5.3.1/fabric.min.js"></script>
     
@@ -62,7 +62,7 @@
             box-sizing: border-box;
         }
 
-        /* Side Bar Styling (V123 Standard) */
+        /* Side Bar Styling (V130 Refined Size) */
         .side-glass-capsule {
             background: var(--glass-bg);
             backdrop-filter: blur(24px) saturate(180%);
@@ -70,29 +70,31 @@
             border: 1px solid var(--glass-border);
             box-shadow: var(--glass-shadow);
             box-sizing: border-box;
-            border-radius: 20px; 
-            padding: 6px; 
+            /* V130: Smaller radius, padding, and gap */
+            border-radius: 18px; 
+            padding: 5px; 
             display: flex; 
             flex-direction: column; 
-            gap: 8px;
+            gap: 6px;
             z-index: 90;
         }
 
+        /* V129 FIX: No transition for instant sync */
         .side-bar {
             position: fixed; top: 50%; transform: translateY(-50%);
-            transition: left 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
         }
 
         .side-bar-bottom {
             position: fixed; 
-            transition: left 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), top 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
         }
 
+        /* V130: Smaller Side Buttons */
         .side-btn {
-            width: 44px; height: 44px; 
-            border-radius: 14px; 
+            width: 36px; height: 36px; /* Reduced size */
+            border-radius: 12px;       /* Reduced radius */
             display: flex; align-items: center; justify-content: center;
-            font-size: 20px; color: var(--text-sub);
+            font-size: 18px;           /* Reduced icon size */
+            color: var(--text-sub);
             cursor: pointer; 
             transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
             border: 1px solid transparent;
@@ -110,12 +112,12 @@
         .side-btn.danger:hover { background: rgba(255, 69, 58, 0.15); color: var(--danger-color); border-color: var(--danger-color); }
 
 
-        /* V127: Flattened Dock Container (No Hero Button) */
+        /* V127: Flattened Dock Container */
         .bottom-dock-container {
             position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
             padding: 8px 12px;
             border-radius: 24px;
-            display: flex; align-items: center; gap: 12px; /* Consistent gap */
+            display: flex; align-items: center; gap: 12px;
             z-index: 100;
             padding-bottom: calc(8px + env(safe-area-inset-bottom, 0));
             margin-bottom: env(safe-area-inset-bottom, 0);
@@ -175,7 +177,17 @@
         .menu-icon-span { width: 24px; text-align: center; margin-right: 10px; font-size: 18px; }
 
         .text-colors-container { display: flex; gap: 6px; padding: 8px 4px; justify-content: space-around; border-bottom: 1px solid rgba(255,255,255,0.08); margin-bottom: 6px; }
-        .text-color-dot { width: 18px; height: 18px; border-radius: 50%; cursor: pointer; border: 2px solid rgba(255,255,255,0.1); transition: transform 0.2s; }
+        
+        /* V131 FIX: Added flex-shrink and box-sizing to prevent squishing */
+        .text-color-dot { 
+            width: 18px; height: 18px; 
+            border-radius: 50%; 
+            cursor: pointer; 
+            border: 2px solid rgba(255,255,255,0.1); 
+            transition: transform 0.2s; 
+            flex-shrink: 0;
+            box-sizing: border-box;
+        }
         .text-color-dot:hover { transform: scale(1.2); border-color: white; }
 
         .align-toolbar { display: flex; gap: 4px; background: rgba(255,255,255,0.05); border-radius: 10px; padding: 4px; margin-bottom: 6px; }
@@ -208,7 +220,7 @@
 
         /* Modals */
         #confirm-modal, #info-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); backdrop-filter: blur(8px); z-index: 3000; animation: fadeIn 0.3s; }
-        /* V121 Info Modal Size */
+        /* V121 Info Modal Size (240px) */
         .modal-box { 
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
             background: #222; border: 1px solid #444; 
@@ -499,8 +511,8 @@
             
             if(sideBarBottom) {
                 sideBarBottom.style.left = newLeft;
-                // V123/V128: Correct calculation for alignment with canvas bottom
-                sideBarBottom.style.top = (contentBottomEdge - 108) + 'px'; 
+                // V130: Adjusted offset for smaller buttons (new height ~88px) + 5px upward shift = 93px
+                sideBarBottom.style.top = (contentBottomEdge - 93) + 'px'; 
             }
         }
 
@@ -509,7 +521,7 @@
             const winH = window.innerHeight;
             const zoom = canvas.getZoom();
             
-            const toolbar = document.querySelector('.bottom-bar');
+            const toolbar = document.querySelector('.bottom-dock-container');
             const toolbarHeight = toolbar ? toolbar.offsetHeight + 50 : 100;
             const visualSpaceCenterY = (winH - toolbarHeight) / 2;
             const contentHalfHeight = (SCREEN_HEIGHT * zoom) / 2;
@@ -731,6 +743,7 @@
                     clearTimeout(longPressTimer);
                 }
 
+                // V105 Optimization: Use cached layout state
                 if (layoutState.visualHeight <= layoutState.availableHeight) {
                     deltaY = 0; 
                     velocityY = 0; 
@@ -1161,7 +1174,6 @@
             });
         }
 
-        // V105 Optimization: Process Image Helper
         function processImageFile(file, isBackground = false) {
             const reader = new FileReader();
             reader.onload = (f) => {
@@ -1186,7 +1198,6 @@
             reader.readAsDataURL(file);
         }
 
-        // V105 Optimization: Rendering Lines Array (No more Objects)
         let renderingLines = [];
 
         canvas.on('object:moving', function(e) {
@@ -1250,7 +1261,6 @@
             canvas.requestRenderAll(); 
         });
 
-        // V109 Fix: Correct transform for Retina/High-DPI screens
         canvas.on('after:render', function(opt) {
             if(renderingLines.length === 0) return;
             const ctx = canvas.getContext();
