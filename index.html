@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Spark Canvas - V109 (辅助线对齐修复版)</title>
+    <title>Spark Canvas - V111 (侧边栏紧凑版)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
     <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
     
@@ -49,7 +49,7 @@
             z-index: 90;
         }
 
-        /* V108: Side Bar Bottom (Dynamic Positioning) */
+        /* Side Bar Bottom (Dynamic Positioning) */
         .side-bar-bottom {
             position: fixed;
             display: flex; flex-direction: column; gap: 12px;
@@ -57,10 +57,15 @@
         }
 
         .side-btn {
-            width: 44px; height: 44px; border-radius: 50%;
+            /* V111: Reduced size from 44px to 38px */
+            width: 38px; height: 38px; 
+            border-radius: 50%;
             background: var(--panel-bg); backdrop-filter: blur(20px);
             border: 1px solid rgba(255,255,255,0.1);
-            color: #ddd; font-size: 20px; display: flex; align-items: center; justify-content: center;
+            color: #ddd; 
+            /* V111: Slightly smaller icon size */
+            font-size: 18px; 
+            display: flex; align-items: center; justify-content: center;
             cursor: pointer; transition: all 0.2s;
             box-shadow: 0 4px 12px rgba(0,0,0,0.3);
         }
@@ -73,7 +78,9 @@
 
         /* Bottom Bar */
         .bottom-bar {
-            position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
+            position: fixed; 
+            bottom: 20px; 
+            left: 50%; transform: translateX(-50%);
             display: flex; gap: 40px; align-items: center;
             padding: 0 20px;
             z-index: 100;
@@ -454,7 +461,8 @@
             const contentBottomEdge = vpt[5] + (SCREEN_HEIGHT * zoom);
 
             // Calculate Left Position (for both sidebars)
-            const newLeft = (contentRightEdge + 15) + 'px';
+            // V111: Reduced gap from 15px to 8px to move buttons closer to canvas
+            const newLeft = (contentRightEdge + 8) + 'px';
             
             // Update Center Sidebar
             sideBar.style.left = newLeft; 
@@ -462,9 +470,9 @@
             // Update Bottom Sidebar (Clear Button)
             if(sideBarBottom) {
                 sideBarBottom.style.left = newLeft;
-                // V108: Align button's bottom with canvas content's bottom.
-                // Button height is 44px.
-                sideBarBottom.style.top = (contentBottomEdge - 44) + 'px';
+                // V111: Align button's bottom with canvas content's bottom.
+                // Button height is now 38px.
+                sideBarBottom.style.top = (contentBottomEdge - 38) + 'px';
             }
         }
 
@@ -1080,11 +1088,13 @@
             triggerAutoSave();
         }
 
+        // V102: Focus on Page Functionality
         function addScreen() { 
             screenCount++; 
             updateWorkspace(); 
             canvas.requestRenderAll(); 
             triggerAutoSave(); 
+            // Focus on the new page (index = count - 1)
             focusOnPage(screenCount - 1);
         }
         function removeScreen() { 
@@ -1093,6 +1103,7 @@
                 updateWorkspace(); 
                 canvas.requestRenderAll(); 
                 triggerAutoSave(); 
+                // Focus on the last remaining page
                 focusOnPage(screenCount - 1);
             } 
         }
@@ -1109,31 +1120,6 @@
                 canvas.requestRenderAll();
                 triggerAutoSave();
             }
-        }
-
-        // V105 Optimization: Process Image Helper
-        function processImageFile(file, isBackground = false) {
-            const reader = new FileReader();
-            reader.onload = (f) => {
-                if (isBackground) {
-                    applyPattern(f.target.result);
-                } else {
-                    const center = canvas.getVpCenter();
-                    fabric.Image.fromURL(f.target.result, (img) => {
-                        if (img.width > SCREEN_WIDTH) img.scaleToWidth(SCREEN_WIDTH * 0.8);
-                        const offsetX = (Math.random() * 40 - 20);
-                        const offsetY = (Math.random() * 40 - 20);
-                        img.set({ left: center.x - (img.getScaledWidth()/2) + offsetX, top: center.y - (img.getScaledHeight()/2) + offsetY });
-                        img.setControlsVisibility({ mt: false, mb: false, ml: false, mr: false });
-                        canvas.add(img); 
-                        canvas.setActiveObject(img); 
-                        bringGridToFront(); 
-                        triggerAutoSave();
-                        canvas.requestRenderAll(); 
-                    });
-                }
-            };
-            reader.readAsDataURL(file);
         }
 
         function handleFiles(files) {
@@ -1159,6 +1145,31 @@
                     triggerAutoSave();
                 }
             });
+        }
+
+        // V105 Optimization: Process Image Helper
+        function processImageFile(file, isBackground = false) {
+            const reader = new FileReader();
+            reader.onload = (f) => {
+                if (isBackground) {
+                    applyPattern(f.target.result);
+                } else {
+                    const center = canvas.getVpCenter();
+                    fabric.Image.fromURL(f.target.result, (img) => {
+                        if (img.width > SCREEN_WIDTH) img.scaleToWidth(SCREEN_WIDTH * 0.8);
+                        const offsetX = (Math.random() * 40 - 20);
+                        const offsetY = (Math.random() * 40 - 20);
+                        img.set({ left: center.x - (img.getScaledWidth()/2) + offsetX, top: center.y - (img.getScaledHeight()/2) + offsetY });
+                        img.setControlsVisibility({ mt: false, mb: false, ml: false, mr: false });
+                        canvas.add(img); 
+                        canvas.setActiveObject(img); 
+                        bringGridToFront(); 
+                        triggerAutoSave();
+                        canvas.requestRenderAll(); 
+                    });
+                }
+            };
+            reader.readAsDataURL(file);
         }
 
         // V105 Optimization: Rendering Lines Array (No more Objects)
