@@ -3,13 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Spark Canvas - V111 (侧边栏紧凑版)</title>
+    <title>Spark Canvas - V114 (指南加宽版)</title>
+    
     <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
     <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
     
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300..900&family=Noto+Serif+SC:wght@300..900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@100..900&family=Noto+Serif+SC:wght@100..900&display=swap" rel="stylesheet">
 
     <style>
         :root { --bg-color: #1e1e1e; --panel-bg: rgba(30, 30, 30, 0.85); --accent-color: #007AFF; --danger-color: #ff453a; --text-color: #fff; --border-color: #444; }
@@ -25,9 +26,7 @@
             -webkit-user-select: none; user-select: none;
         }
         
-        #status-indicator { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); font-size: 11px; color: #aaa; background: rgba(30,30,30,0.6); backdrop-filter: blur(10px); padding: 6px 16px; border-radius: 20px; transition: all 0.3s; font-weight: 500; z-index: 10; opacity: 0; pointer-events: none; border: 1px solid rgba(255,255,255,0.1); }
-        #status-indicator.visible { opacity: 1; top: 30px; }
-        .status-saved { color: #32D74B !important; } .status-saving { color: #FFD700 !important; }
+        #status-indicator { display: none !important; }
 
         #canvas-wrapper { 
             width: 100vw; height: 100dvh; 
@@ -49,7 +48,7 @@
             z-index: 90;
         }
 
-        /* Side Bar Bottom (Dynamic Positioning) */
+        /* Side Bar Bottom */
         .side-bar-bottom {
             position: fixed;
             display: flex; flex-direction: column; gap: 12px;
@@ -57,13 +56,11 @@
         }
 
         .side-btn {
-            /* V111: Reduced size from 44px to 38px */
             width: 38px; height: 38px; 
             border-radius: 50%;
             background: var(--panel-bg); backdrop-filter: blur(20px);
             border: 1px solid rgba(255,255,255,0.1);
             color: #ddd; 
-            /* V111: Slightly smaller icon size */
             font-size: 18px; 
             display: flex; align-items: center; justify-content: center;
             cursor: pointer; transition: all 0.2s;
@@ -199,8 +196,9 @@
         .show-always { display: flex !important; } 
         .show-header { display: block !important; }
         
-        #confirm-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); backdrop-filter: blur(5px); z-index: 3000; animation: fadeIn 0.2s; }
-        .modal-box { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #2c2c2c; border: 1px solid #555; border-radius: 16px; padding: 25px; width: 280px; text-align: center; box-shadow: 0 20px 50px rgba(0,0,0,0.5); }
+        #confirm-modal, #info-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); backdrop-filter: blur(5px); z-index: 3000; animation: fadeIn 0.2s; }
+        /* V114 Update: Width 340px */
+        .modal-box { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #2c2c2c; border: 1px solid #555; border-radius: 16px; padding: 25px; width: 340px; max-width: 85%; text-align: center; box-shadow: 0 20px 50px rgba(0,0,0,0.5); }
         .modal-title { font-size: 18px; font-weight: bold; margin-bottom: 10px; color: white; }
         .modal-desc { font-size: 14px; color: #aaa; margin-bottom: 20px; line-height: 1.5; }
         .modal-actions { display: flex; gap: 10px; justify-content: center; }
@@ -209,8 +207,15 @@
         .modal-btn.cancel:hover { background: #555; }
         .modal-btn.confirm { background: var(--danger-color); color: white; }
         .modal-btn.confirm:hover { background: #ff5b50; }
+        .modal-btn.primary { background: var(--accent-color); color: white; }
+        .modal-btn.primary:hover { background: #0062cc; }
 
         #file-input, #bg-file-input { display: none; }
+        
+        /* V113: Info List Styles */
+        .info-list { text-align: left; font-size: 14px; color: #ccc; margin-bottom: 20px; }
+        .info-item { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+        .info-icon { font-size: 24px; width: 24px; text-align: center; color: var(--accent-color); }
     </style>
 </head>
 <body>
@@ -223,6 +228,7 @@
     </div>
 
     <div class="side-bar-bottom">
+        <div class="side-btn" onclick="showInfoModal()" title="操作指南"><i class="ri-information-line"></i></div>
         <div class="side-btn danger" onclick="showModal()" title="清空"><i class="ri-delete-bin-line"></i></div>
     </div>
 
@@ -272,6 +278,19 @@
             <div class="modal-actions">
                 <button class="modal-btn cancel" onclick="closeModal()">取消</button>
                 <button class="modal-btn confirm" onclick="executeClear()">确认清空</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="info-modal">
+        <div class="modal-box">
+            <div class="modal-title">HOW TO</div>
+            <div class="info-list">
+                <div class="info-item"><i class="info-icon ri-computer-line"></i> <span>在图片或文字上 <b>右键点击</b> 弹出操作菜单。</span></div>
+                <div class="info-item"><i class="info-icon ri-smartphone-line"></i> <span>在图片或文字上 <b>长按</b> 弹出操作菜单。</span></div>
+            </div>
+            <div class="modal-actions">
+                <button class="modal-btn primary" onclick="closeInfoModal()">知道了</button>
             </div>
         </div>
     </div>
@@ -407,6 +426,7 @@
         const bgPanel = document.getElementById('bg-panel');
         const statusIndicator = document.getElementById('status-indicator');
         const confirmModal = document.getElementById('confirm-modal');
+        const infoModal = document.getElementById('info-modal');
         const addPopover = document.getElementById('add-popover');
         const sideBar = document.querySelector('.side-bar');
         const sideBarBottom = document.querySelector('.side-bar-bottom');
@@ -472,7 +492,7 @@
                 sideBarBottom.style.left = newLeft;
                 // V111: Align button's bottom with canvas content's bottom.
                 // Button height is now 38px.
-                sideBarBottom.style.top = (contentBottomEdge - 38) + 'px';
+                sideBarBottom.style.top = (contentBottomEdge - 88) + 'px'; // Adjusted to accommodate two buttons (38*2 + 12 gap)
             }
         }
 
@@ -883,7 +903,8 @@
         // --- 功能函数 ---
 
         let longPressTimer;
-        const FONT_WEIGHTS = [300, 400, 600, 900];
+        // V112 Update: Full font weights
+        const FONT_WEIGHTS = [100, 200, 300, 400, 500, 700, 900];
 
         function menuAction(action) {
             const obj = canvas.getActiveObject(); if (!obj) return;
@@ -1033,6 +1054,10 @@
         function showModal() { confirmModal.style.display = 'block'; }
         function closeModal() { confirmModal.style.display = 'none'; }
         
+        // Info Modal Functions
+        function showInfoModal() { infoModal.style.display = 'block'; }
+        function closeInfoModal() { infoModal.style.display = 'none'; }
+
         function executeClear() {
             canvas.clear(); 
             bgRect = null;
@@ -1088,13 +1113,11 @@
             triggerAutoSave();
         }
 
-        // V102: Focus on Page Functionality
         function addScreen() { 
             screenCount++; 
             updateWorkspace(); 
             canvas.requestRenderAll(); 
             triggerAutoSave(); 
-            // Focus on the new page (index = count - 1)
             focusOnPage(screenCount - 1);
         }
         function removeScreen() { 
@@ -1103,7 +1126,6 @@
                 updateWorkspace(); 
                 canvas.requestRenderAll(); 
                 triggerAutoSave(); 
-                // Focus on the last remaining page
                 focusOnPage(screenCount - 1);
             } 
         }
