@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Spark Canvas - V114 (指南加宽版)</title>
+    <title>Spark Canvas - V121 (控制按钮位置互换版)</title>
     
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
-    <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
+    <script src="https://cdn.staticfile.org/fabric.js/5.3.1/fabric.min.js"></script>
     
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@100..900&family=Noto+Serif+SC:wght@100..900&display=swap" rel="stylesheet">
+    <link href="https://cdn.staticfile.org/remixicon/3.5.0/remixicon.css" rel="stylesheet">
+    
+    <link rel="preconnect" href="https://fonts.geekzu.org">
+    <link href="https://fonts.geekzu.org/css2?family=Noto+Sans+SC:wght@100..900&family=Noto+Serif+SC:wght@200..900&display=swap" rel="stylesheet">
 
     <style>
         :root { --bg-color: #1e1e1e; --panel-bg: rgba(30, 30, 30, 0.85); --accent-color: #007AFF; --danger-color: #ff453a; --text-color: #fff; --border-color: #444; }
@@ -197,8 +197,8 @@
         .show-header { display: block !important; }
         
         #confirm-modal, #info-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); backdrop-filter: blur(5px); z-index: 3000; animation: fadeIn 0.2s; }
-        /* V114 Update: Width 340px */
-        .modal-box { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #2c2c2c; border: 1px solid #555; border-radius: 16px; padding: 25px; width: 340px; max-width: 85%; text-align: center; box-shadow: 0 20px 50px rgba(0,0,0,0.5); }
+        /* V120: Width adjusted to 300px for tight fit */
+        .modal-box { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #2c2c2c; border: 1px solid #555; border-radius: 16px; padding: 25px; width: 300px; max-width: 85%; text-align: center; box-shadow: 0 20px 50px rgba(0,0,0,0.5); }
         .modal-title { font-size: 18px; font-weight: bold; margin-bottom: 10px; color: white; }
         .modal-desc { font-size: 14px; color: #aaa; margin-bottom: 20px; line-height: 1.5; }
         .modal-actions { display: flex; gap: 10px; justify-content: center; }
@@ -212,10 +212,10 @@
 
         #file-input, #bg-file-input { display: none; }
         
-        /* V113: Info List Styles */
-        .info-list { text-align: left; font-size: 14px; color: #ccc; margin-bottom: 20px; }
-        .info-item { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
-        .info-icon { font-size: 24px; width: 24px; text-align: center; color: var(--accent-color); }
+        /* V115: Info List Styles (Optimized) */
+        .info-list { text-align: left; font-size: 14px; color: #ccc; margin-bottom: 25px; }
+        .info-item { display: flex; align-items: center; gap: 16px; margin-bottom: 15px; }
+        .info-icon { font-size: 32px; width: 32px; text-align: center; color: var(--accent-color); flex-shrink: 0; }
     </style>
 </head>
 <body>
@@ -286,8 +286,8 @@
         <div class="modal-box">
             <div class="modal-title">HOW TO</div>
             <div class="info-list">
-                <div class="info-item"><i class="info-icon ri-computer-line"></i> <span>在图片或文字上 <b>右键点击</b> 弹出操作菜单。</span></div>
-                <div class="info-item"><i class="info-icon ri-smartphone-line"></i> <span>在图片或文字上 <b>长按</b> 弹出操作菜单。</span></div>
+                <div class="info-item"><i class="info-icon ri-computer-line"></i> <span>图片/文字上 <b>右键</b> 唤起菜单</span></div>
+                <div class="info-item"><i class="info-icon ri-smartphone-line"></i> <span>图片/文字上 <b>长按</b> 唤起菜单</span></div>
             </div>
             <div class="modal-actions">
                 <button class="modal-btn primary" onclick="closeInfoModal()">知道了</button>
@@ -344,22 +344,22 @@
         <div class="control-row text-menu-item">
             <span class="control-label">字重 Weight</span>
             <div class="control-group">
-                <div class="control-btn" onclick="menuAction('weight-down')"><i class="ri-subtract-line"></i></div>
                 <div class="control-btn" onclick="menuAction('weight-up')"><i class="ri-add-line"></i></div>
+                <div class="control-btn" onclick="menuAction('weight-down')"><i class="ri-subtract-line"></i></div>
             </div>
         </div>
         <div class="control-row text-menu-item">
             <span class="control-label">字距 Spacing</span>
             <div class="control-group">
-                <div class="control-btn" onclick="menuAction('spacing-down')"><i class="ri-subtract-line"></i></div>
                 <div class="control-btn" onclick="menuAction('spacing-up')"><i class="ri-add-line"></i></div>
+                <div class="control-btn" onclick="menuAction('spacing-down')"><i class="ri-subtract-line"></i></div>
             </div>
         </div>
         <div class="control-row text-menu-item">
             <span class="control-label">行高 Height</span>
             <div class="control-group">
-                <div class="control-btn" onclick="menuAction('line-height-down')"><i class="ri-subtract-line"></i></div>
                 <div class="control-btn" onclick="menuAction('line-height-up')"><i class="ri-add-line"></i></div>
+                <div class="control-btn" onclick="menuAction('line-height-down')"><i class="ri-subtract-line"></i></div>
             </div>
         </div>
 
@@ -903,8 +903,8 @@
         // --- 功能函数 ---
 
         let longPressTimer;
-        // V112 Update: Full font weights
-        const FONT_WEIGHTS = [100, 200, 300, 400, 500, 700, 900];
+        // V112 Update: Full font weights, added 600, 800
+        const FONT_WEIGHTS = [100, 200, 300, 400, 500, 600, 700, 800, 900];
 
         function menuAction(action) {
             const obj = canvas.getActiveObject(); if (!obj) return;
