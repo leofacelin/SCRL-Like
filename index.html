@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Spark Canvas - V104 (原生级滚动)</title>
+    <title>Spark Canvas - V102 (焦点跟随+惯性滑动)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
     <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
     
@@ -41,12 +41,12 @@
         .canvas-container { margin: 0 auto; background: transparent !important; }
         canvas { background: transparent !important; }
 
+        /* Side Bar (Fixed positioning logic) */
         .side-bar {
             position: fixed; 
             top: 50%; transform: translateY(-50%);
             display: flex; flex-direction: column; gap: 12px;
             z-index: 90;
-            transition: left 0.1s ease-out; /* Slight transition for smoother follow */
         }
         .side-btn {
             width: 44px; height: 44px; border-radius: 50%;
@@ -60,6 +60,7 @@
         .side-btn:active { transform: scale(0.95); }
         .side-btn i { pointer-events: none; }
 
+        /* Bottom Bar */
         .bottom-bar {
             position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
             display: flex; gap: 40px; align-items: center;
@@ -85,6 +86,7 @@
         .main-btn.accent { background: var(--accent-color); border: none; }
         .main-btn i { pointer-events: none; }
 
+        /* Add Popover Menu */
         #add-popover {
             position: absolute; bottom: 70px; left: 50%; transform: translateX(-50%) scale(0.8);
             background: rgba(40,40,40,0.95); backdrop-filter: blur(20px);
@@ -106,6 +108,7 @@
         .pop-item:hover { background: rgba(255,255,255,0.1); color: #fff; }
         .pop-item i { font-size: 18px; }
 
+        /* Panels */
         #bg-panel { display: none; position: absolute; bottom: 100px; left: 50%; transform: translateX(-50%); background: rgba(30, 30, 30, 0.95); backdrop-filter: blur(20px); border: 1px solid #444; border-radius: 16px; padding: 15px; box-shadow: 0 10px 40px rgba(0,0,0,0.8); z-index: 90; animation: panelUp 0.2s; width: 240px; }
         @keyframes panelUp { from { opacity: 0; transform: translate(-50%, 20px); } to { opacity: 1; transform: translate(-50%, 0); } }
         .panel-title { font-size: 12px; color: #888; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 1px; text-align: center; }
@@ -147,6 +150,7 @@
         .control-btn:hover { background: #555; color: white; }
         .control-btn:active { transform: scale(0.9); }
 
+        /* Font List Popup */
         .font-selector-row { display: none; padding: 2px; margin-bottom: 4px; }
         .font-toggle-btn {
             display: flex; justify-content: space-between; align-items: center;
@@ -430,39 +434,28 @@
             sideBar.style.left = (contentRightEdge + 15) + 'px'; 
         }
 
+        // V102: Focus on specific page index (Center Align)
         function focusOnPage(index) {
             const winW = window.innerWidth;
             const winH = window.innerHeight;
             const zoom = canvas.getZoom();
             
+            // Calculate Vertical Center (Safety Area above toolbar)
             const toolbar = document.querySelector('.bottom-bar');
             const toolbarHeight = toolbar ? toolbar.offsetHeight + 50 : 100;
             const visualSpaceCenterY = (winH - toolbarHeight) / 2;
             const contentHalfHeight = (SCREEN_HEIGHT * zoom) / 2;
             const targetY = visualSpaceCenterY - contentHalfHeight + 20;
 
+            // Calculate Horizontal Center for specific page
+            // Center of Page i = (index * Width) + (Width / 2)
+            // We want that center to be at WindowWidth / 2
             const vpt = canvas.viewportTransform;
-            
-            // Current Center Target
-            const targetX = (winW / 2) - ((index * SCREEN_WIDTH + SCREEN_WIDTH / 2) * zoom);
-            
-            // Animate Pan
-            fabric.util.animate({
-                startValue: vpt[4],
-                endValue: targetX,
-                duration: 400,
-                onChange: function(value) {
-                    vpt[4] = value;
-                    vpt[5] = targetY; // Ensure vertical center
-                    canvas.requestRenderAll();
-                    updateSideBarPosition();
-                },
-                onComplete: function() {
-                    canvas.setViewportTransform(vpt);
-                    updateHitRegions();
-                },
-                easing: fabric.util.ease.easeOutQuart
-            });
+            vpt[4] = (winW / 2) - ((index * SCREEN_WIDTH + SCREEN_WIDTH / 2) * zoom);
+            vpt[5] = targetY;
+
+            canvas.requestRenderAll();
+            updateSideBarPosition();
         }
 
         function initViewport() {
@@ -486,17 +479,10 @@
             if (zoom < 0.1) zoom = 0.1;
             canvas.setZoom(zoom);
 
-            // Center initial page
-            const vpt = canvas.viewportTransform;
-            vpt[4] = (winW - SCREEN_WIDTH * zoom) / 2;
-            
-            const visualSpaceCenterY = (winH - toolbarHeight) / 2;
-            const contentHalfHeight = (SCREEN_HEIGHT * zoom) / 2;
-            vpt[5] = visualSpaceCenterY - contentHalfHeight + 20; 
+            // Initial focus on first page (or could track current page)
+            focusOnPage(0);
             
             updateHitRegions(); 
-            canvas.requestRenderAll();
-            updateSideBarPosition(); 
         }
         
         function updateHitRegions() {
@@ -516,12 +502,11 @@
         let lastX, lastY;
         let mouseDownPoint = {x:0, y:0};
         let mouseDownTarget = null; 
-        
-        // V104: Enhanced Physics Variables
-        let velocity = { x: 0 };
-        let lastTime = 0;
-        let animationFrame;
-        const FRICTION = 0.95;
+
+        // Momentum Variables
+        let velocityX = 0, velocityY = 0;
+        let lastMoveTime = 0;
+        let momentumID = null;
 
         function getClientPos(e) {
             if (e.touches && e.touches.length > 0) {
@@ -553,9 +538,10 @@
             const evt = opt.e;
             const target = opt.target;
 
-            // Stop physics
-            cancelAnimationFrame(animationFrame);
-            velocity = { x: 0 };
+            // Momentum: Stop previous animation
+            cancelAnimationFrame(momentumID);
+            velocityX = 0; velocityY = 0;
+            lastMoveTime = Date.now();
 
             if (addPopover.classList.contains('active')) {
                 toggleAddMenu(false);
@@ -571,7 +557,6 @@
 
             const pos = getClientPos(evt);
             lastX = pos.x; lastY = pos.y;
-            lastTime = Date.now();
             mouseDownPoint = { x: pos.x, y: pos.y };
 
             if (contextMenu.style.display === 'block' && opt.button !== 3) {
@@ -635,36 +620,39 @@
                 const pos = getClientPos(evt);
                 if (pos.x === undefined || pos.y === undefined) return;
                 
-                let deltaX = pos.x - lastX;
-                
-                // V104: Velocity Tracking
                 const now = Date.now();
-                const dt = now - lastTime;
+                const dt = now - lastMoveTime;
+
+                let deltaX = pos.x - lastX;
+                let deltaY = pos.y - lastY;
+
+                // Momentum: Calculate velocity (pixels per ms)
+                // Use a low-pass filter to smooth out velocity (0.2 current + 0.8 old)
                 if (dt > 0) {
-                    velocity.x = deltaX; // Pure distance per frame roughly
-                    lastTime = now;
+                    const newVx = deltaX / dt;
+                    const newVy = deltaY / dt;
+                    velocityX = velocityX * 0.5 + newVx * 0.5;
+                    velocityY = velocityY * 0.5 + newVy * 0.5;
+                    lastMoveTime = now;
                 }
 
-                if (Math.abs(deltaX) > 2) {
+                if (Math.abs(deltaX) > 2 || Math.abs(deltaY) > 2) {
                     clearTimeout(longPressTimer);
                 }
 
-                // V104: Horizontal Boundary Damping
-                const vpt = canvas.viewportTransform;
-                const zoom = canvas.getZoom();
-                const contentWidth = screenCount * SCREEN_WIDTH * zoom;
-                const minX = canvas.width - contentWidth - 100; 
+                const visualHeight = SCREEN_HEIGHT * canvas.getZoom();
+                const availableHeight = window.innerHeight - (document.querySelector('.bottom-bar').offsetHeight + 30);
                 
-                // Apply rubber band resistance if out of bounds
-                if (vpt[4] > 100 || vpt[4] < minX) {
-                    deltaX /= 3; // Strong damping
+                if (visualHeight <= availableHeight) {
+                    deltaY = 0; 
+                    velocityY = 0; // also kill vertical momentum
                 }
 
-                // V104: Lock Y Axis (Zero deltaY)
-                canvas.relativePan({ x: deltaX, y: 0 });
-                updateSideBarPosition();
+                canvas.relativePan({ x: deltaX, y: deltaY });
+                updateSideBarPosition(); // V101: Move sidebar
                 
                 lastX = pos.x;
+                lastY = pos.y;
             } else {
                 const active = canvas.getActiveObject();
                 if (active && (active.isMoving || active.isScaling || active.isRotating)) {
@@ -676,9 +664,9 @@
 
         canvas.on('mouse:up', function(opt) {
             const evt = opt.e;
+            const pos = getClientPos(evt);
             
             if (isDraggingCanvas && mouseDownTarget && mouseDownTarget.lockMovementX) {
-                const pos = getClientPos(evt);
                 const dist = Math.sqrt(Math.pow(pos.x - mouseDownPoint.x, 2) + Math.pow(pos.y - mouseDownPoint.y, 2));
                 if (dist < 5) { 
                     canvas.setActiveObject(mouseDownTarget);
@@ -686,41 +674,56 @@
                 }
             }
 
-            // V104: Snapback Logic
+            // Momentum: Trigger Glide on Release
             if (isDraggingCanvas) {
-                const vpt = canvas.viewportTransform;
-                const zoom = canvas.getZoom();
-                const winW = window.innerWidth;
-                const pageWidth = SCREEN_WIDTH * zoom;
-                
-                // Calculate current "Scroll" position relative to center
-                // vpt[4] is the left edge. Center is vpt[4] + contentWidth/2
-                // We want to find which page center is closest to screen center (winW/2)
-                
-                // Offset of the first page's left edge from screen center
-                const offset = (winW / 2) - vpt[4] - (pageWidth / 2);
-                let targetIndex = Math.round(offset / pageWidth);
-                
-                // Momentum Influence: If flicked, modify target index
-                if (Math.abs(velocity.x) > 15) { // Threshold
-                    if (velocity.x < 0) targetIndex++; // Swipe Left -> Next
-                    else targetIndex--; // Swipe Right -> Prev
+                const timeSinceLastMove = Date.now() - lastMoveTime;
+                // If user held still for > 100ms before releasing, kill momentum
+                if (timeSinceLastMove > 100) {
+                    velocityX = 0;
+                    velocityY = 0;
                 }
-                
-                // Clamp index
-                if (targetIndex < 0) targetIndex = 0;
-                if (targetIndex >= screenCount) targetIndex = screenCount - 1;
-                
-                // Execute Snap
-                focusOnPage(targetIndex);
+                applyMomentum();
             }
 
             isDraggingCanvas = false;
             isObjectMoving = false;
             clearTimeout(longPressTimer);
-            updateSideBarPosition();
+            canvas.setViewportTransform(canvas.viewportTransform); 
+            // V101 Fix: Removed initViewport here to stop reset
+            updateSideBarPosition(); // Just update buttons
             updateHitRegions(); 
         });
+
+        function applyMomentum() {
+            const friction = 0.95; // 0.90 to 0.99 (Lower = stops faster)
+            const stopThreshold = 0.01;
+
+            function step() {
+                if (Math.abs(velocityX) < stopThreshold && Math.abs(velocityY) < stopThreshold) {
+                    cancelAnimationFrame(momentumID);
+                    return;
+                }
+
+                velocityX *= friction;
+                velocityY *= friction;
+
+                let panX = velocityX * 16; // Approx 16ms per frame
+                let panY = velocityY * 16;
+
+                // Enforce V102 Vertical Constraints
+                const visualHeight = SCREEN_HEIGHT * canvas.getZoom();
+                const availableHeight = window.innerHeight - (document.querySelector('.bottom-bar').offsetHeight + 30);
+                if (visualHeight <= availableHeight) {
+                    panY = 0;
+                }
+
+                canvas.relativePan({ x: panX, y: panY });
+                updateSideBarPosition();
+                
+                momentumID = requestAnimationFrame(step);
+            }
+            step();
+        }
 
         canvas.on('mouse:wheel', function(opt) {
             opt.e.preventDefault();
@@ -989,11 +992,13 @@
             triggerAutoSave();
         }
 
+        // V102: Focus on Page Functionality
         function addScreen() { 
             screenCount++; 
             updateWorkspace(); 
             canvas.requestRenderAll(); 
             triggerAutoSave(); 
+            // Focus on the new page (index = count - 1)
             focusOnPage(screenCount - 1);
         }
         function removeScreen() { 
@@ -1002,6 +1007,7 @@
                 updateWorkspace(); 
                 canvas.requestRenderAll(); 
                 triggerAutoSave(); 
+                // Focus on the last remaining page
                 focusOnPage(screenCount - 1);
             } 
         }
