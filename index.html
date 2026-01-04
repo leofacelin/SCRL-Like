@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Spark Canvas - V95 (吸附修复增强版)</title>
+    <title>Spark Canvas - V97 (完美修复版)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
     <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
     
@@ -491,7 +491,7 @@
                         isDraggingCanvas = false; 
                         canvas.setActiveObject(target); 
                         openContextMenu(opt);
-                    } else if (!isDraggingCanvas && !canvas.getActiveObject().isMoving) {
+                    } else if (!isDraggingCanvas && !canvas.getActiveObject().isMoving && !canvas.getActiveObject().isScaling && !canvas.getActiveObject().isRotating) {
                         openContextMenu(opt);
                     }
                 }, 500);
@@ -552,13 +552,7 @@
         });
 
         canvas.on('mouse:wheel', function(opt) {
-            const delta = opt.e.deltaY;
-            let zoom = canvas.getZoom();
-            zoom *= 0.999 ** delta;
-            if (zoom > 5) zoom = 5;
-            if (zoom < 0.1) zoom = 0.1;
-            canvas.zoomToPoint({ x: opt.e.offsetX, y: opt.e.offsetY }, zoom);
-            updateHitRegions(); 
+            // V97: Fixed Viewport - Disable Mouse Wheel Zoom
             opt.e.preventDefault();
             opt.e.stopPropagation();
         });
@@ -582,8 +576,8 @@
                     pinchMode = 'object';
                     initialObjectScale = target.scaleX;
                 } else {
-                    pinchMode = 'canvas';
-                    initialZoom = canvas.getZoom();
+                    // V97: Fixed Viewport - Disable Canvas Pinch Zoom
+                    pinchMode = null; 
                 }
                 e.preventDefault();
             }
@@ -595,15 +589,8 @@
                 const dx = e.touches[0].clientX - e.touches[1].clientX;
                 const dy = e.touches[0].clientY - e.touches[1].clientY;
                 const currentDistance = Math.sqrt(dx * dx + dy * dy);
-                if (pinchMode === 'canvas') {
-                    const scale = currentDistance / initialDistance;
-                    let newZoom = initialZoom * scale;
-                    if (newZoom > 5) newZoom = 5;
-                    if (newZoom < 0.1) newZoom = 0.1;
-                    const cx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
-                    const cy = (e.touches[0].clientY + e.touches[1].clientY) / 2;
-                    canvas.zoomToPoint({ x: cx, y: cy }, newZoom);
-                } else if (pinchMode === 'object') {
+                
+                if (pinchMode === 'object') {
                     const target = canvas.getActiveObject();
                     if(target) {
                         const scaleFactor = currentDistance / initialDistance;
@@ -820,11 +807,70 @@
             } 
         }
 
-        // V95: Snapping Logic Fixed & Enhanced
+        function toggleBgPanel() {
+            const isVisible = bgPanel.style.display === 'block';
+            bgPanel.style.display = isVisible ? 'none' : 'block';
+        }
+
+        function changeBackgroundColor(color) {
+            currentBgFill = color;
+            if(bgRect) {
+                bgRect.set('fill', color);
+                canvas.requestRenderAll();
+                triggerAutoSave();
+            }
+        }
+
+        // V97 Fix: handleFiles robust check + manual render
+        function handleFiles(files) {
+            if (!files || !files[0]) return;
+            const center = canvas.getVpCenter();
+            Array.from(files).forEach(file => {
+                const reader = new FileReader();
+                reader.onload = (f) => {
+                    fabric.Image.fromURL(f.target.result, (img) => {
+                        if (img.width > SCREEN_WIDTH) img.scaleToWidth(SCREEN_WIDTH * 0.8);
+                        const offsetX = (Math.random() * 40 - 20);
+                        const offsetY = (Math.random() * 40 - 20);
+                        img.set({ left: center.x - (img.getScaledWidth()/2) + offsetX, top: center.y - (img.getScaledHeight()/2) + offsetY });
+                        img.setControlsVisibility({ mt: false, mb: false, ml: false, mr: false });
+                        canvas.add(img); 
+                        canvas.setActiveObject(img); 
+                        bringGridToFront(); 
+                        triggerAutoSave();
+                        canvas.requestRenderAll(); // Force render to prevent invisible image bug
+                    });
+                };
+                reader.readAsDataURL(file);
+            });
+            document.getElementById('file-input').value = '';
+        }
+
+        function handleBgFile(files) {
+            if (!files || !files[0]) return;
+            const reader = new FileReader();
+            reader.onload = function(f) { applyPattern(f.target.result); };
+            reader.readAsDataURL(files[0]);
+            document.getElementById('bg-file-input').value = '';
+        }
+
+        function applyPattern(imgSrc) {
+            fabric.util.loadImage(imgSrc, function(img) {
+                if(!img) return;
+                const pattern = new fabric.Pattern({ source: img, repeat: 'repeat' });
+                currentBgFill = pattern;
+                if(bgRect) {
+                    bgRect.set('fill', pattern);
+                    canvas.requestRenderAll();
+                    triggerAutoSave();
+                }
+            });
+        }
+
         let ctxLines = [];
         canvas.on('object:moving', function(e) {
             const obj = e.target;
-            const threshold = 15; // V95: Increased threshold for better grab
+            const threshold = 15; // V95: Snapping fix
             ctxLines.forEach(line => canvas.remove(line)); ctxLines = [];
             
             const objCenter = obj.getCenterPoint();
@@ -850,9 +896,7 @@
 
             if (!snappedX || !snappedY) {
                 canvas.getObjects().forEach(target => {
-                    // V95: Filter out invisible objects and strict bgRect check
                     if (target === obj || target === bgRect || target.excludeFromExport || !target.visible) return;
-                    
                     const tCenter = target.getCenterPoint();
                     if (!snappedX && Math.abs(objCenter.x - tCenter.x) < threshold) {
                         finalX = tCenter.x;
@@ -867,26 +911,21 @@
                 });
             }
             obj.setPositionByOrigin(new fabric.Point(finalX, finalY), 'center', 'center');
-            canvas.requestRenderAll(); // V95: Force render to show guidelines instantly
+            canvas.requestRenderAll();
         });
         
         canvas.on('mouse:up', function() { 
             ctxLines.forEach(line => canvas.remove(line)); 
             ctxLines = []; 
-            canvas.requestRenderAll(); // V95 Clean up render
+            canvas.requestRenderAll(); 
         });
 
         function drawGuideline(x1, y1, x2, y2) {
             const line = new fabric.Line([x1, y1, x2, y2], { 
-                stroke: '#ff0077', // Magenta for visibility
-                strokeWidth: 1, 
-                strokeDashArray: [4, 4], 
-                selectable: false, 
-                evented: false, 
-                excludeFromExport: true 
+                stroke: '#ff0077', strokeWidth: 1, strokeDashArray: [4, 4], 
+                selectable: false, evented: false, excludeFromExport: true 
             });
-            canvas.add(line); 
-            ctxLines.push(line);
+            canvas.add(line); ctxLines.push(line);
         }
 
         function initDB() {
