@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Spark Canvas - V104 (V102-RubberBand + 混合导出策略)</title>
+    <title>Spark Canvas - V108 (清空按钮动态对齐版)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
     <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
     
@@ -41,13 +41,23 @@
         .canvas-container { margin: 0 auto; background: transparent !important; }
         canvas { background: transparent !important; }
 
-        /* Side Bar */
+        /* Side Bar (Center) */
         .side-bar {
             position: fixed; 
             top: 50%; transform: translateY(-50%);
             display: flex; flex-direction: column; gap: 12px;
             z-index: 90;
         }
+
+        /* V108: Side Bar Bottom (Dynamic Positioning) */
+        .side-bar-bottom {
+            position: fixed;
+            /* bottom: 30px;  REMOVED in V108 */
+            display: flex; flex-direction: column; gap: 12px;
+            z-index: 90;
+            /* Position will be set by JS */
+        }
+
         .side-btn {
             width: 44px; height: 44px; border-radius: 50%;
             background: var(--panel-bg); backdrop-filter: blur(20px);
@@ -59,6 +69,9 @@
         .side-btn:hover { background: #444; color: #fff; transform: scale(1.1); }
         .side-btn:active { transform: scale(0.95); }
         .side-btn i { pointer-events: none; }
+        
+        .side-btn.danger { color: var(--danger-color); border-color: rgba(255, 69, 58, 0.3); }
+        .side-btn.danger:hover { background: var(--danger-color); color: white; border-color: var(--danger-color); }
 
         /* Bottom Bar */
         .bottom-bar {
@@ -204,6 +217,10 @@
         <div class="side-btn" onclick="removeScreen()" title="删除页面"><i class="ri-delete-back-2-line"></i></div>
     </div>
 
+    <div class="side-bar-bottom">
+        <div class="side-btn danger" onclick="showModal()" title="清空"><i class="ri-delete-bin-line"></i></div>
+    </div>
+
     <div class="bottom-bar">
         <div class="bar-btn-group">
             <div id="add-popover">
@@ -217,8 +234,7 @@
             <div class="main-btn" onclick="toggleBgPanel()" title="背景设置"><i class="ri-palette-line"></i></div>
         </div>
 
-        <div class="bar-btn-group" style="display:flex; gap: 10px;">
-            <div class="main-btn danger" onclick="showModal()" style="width:44px; height:44px; font-size:20px;" title="清空"><i class="ri-delete-bin-line"></i></div>
+        <div class="bar-btn-group">
             <div class="main-btn" onclick="exportContent()" title="导出"><i class="ri-download-2-line"></i></div>
         </div>
     </div>
@@ -336,6 +352,9 @@
         let screenCount = 1;
         fabric.textureSize = 2048; 
 
+        // V105 Optimization: Layout Caching
+        let layoutState = { visualHeight: 0, availableHeight: 0 };
+
         const rotateIconImg = new Image();
         rotateIconImg.src = 'rotate.png';
         rotateIconImg.onload = function() { if(canvas) canvas.requestRenderAll(); }
@@ -385,6 +404,7 @@
         const confirmModal = document.getElementById('confirm-modal');
         const addPopover = document.getElementById('add-popover');
         const sideBar = document.querySelector('.side-bar');
+        const sideBarBottom = document.querySelector('.side-bar-bottom');
 
         const DB_NAME = "SparkCanvasDB"; const STORE_NAME = "sessions";
         let db; let saveTimeout;
@@ -430,26 +450,37 @@
             const vpt = canvas.viewportTransform;
             if(!vpt) return;
             const zoom = canvas.getZoom();
+            
+            // V108: Calculate Content Boundaries on Screen
             const contentRightEdge = vpt[4] + (screenCount * SCREEN_WIDTH * zoom);
-            sideBar.style.left = (contentRightEdge + 15) + 'px'; 
+            const contentBottomEdge = vpt[5] + (SCREEN_HEIGHT * zoom);
+
+            // Calculate Left Position (for both sidebars)
+            const newLeft = (contentRightEdge + 15) + 'px';
+            
+            // Update Center Sidebar
+            sideBar.style.left = newLeft; 
+            
+            // Update Bottom Sidebar (Clear Button)
+            if(sideBarBottom) {
+                sideBarBottom.style.left = newLeft;
+                // V108: Align button's bottom with canvas content's bottom.
+                // Button height is 44px.
+                sideBarBottom.style.top = (contentBottomEdge - 44) + 'px';
+            }
         }
 
-        // V102: Focus on specific page index (Center Align)
         function focusOnPage(index) {
             const winW = window.innerWidth;
             const winH = window.innerHeight;
             const zoom = canvas.getZoom();
             
-            // Calculate Vertical Center (Safety Area above toolbar)
             const toolbar = document.querySelector('.bottom-bar');
             const toolbarHeight = toolbar ? toolbar.offsetHeight + 50 : 100;
             const visualSpaceCenterY = (winH - toolbarHeight) / 2;
             const contentHalfHeight = (SCREEN_HEIGHT * zoom) / 2;
             const targetY = visualSpaceCenterY - contentHalfHeight + 20;
 
-            // Calculate Horizontal Center for specific page
-            // Center of Page i = (index * Width) + (Width / 2)
-            // We want that center to be at WindowWidth / 2
             const vpt = canvas.viewportTransform;
             vpt[4] = (winW / 2) - ((index * SCREEN_WIDTH + SCREEN_WIDTH / 2) * zoom);
             vpt[5] = targetY;
@@ -479,9 +510,11 @@
             if (zoom < 0.1) zoom = 0.1;
             canvas.setZoom(zoom);
 
-            // Initial focus on first page (or could track current page)
+            // Update cached layout metrics (V105 Optimization)
+            layoutState.visualHeight = SCREEN_HEIGHT * zoom;
+            layoutState.availableHeight = winH - toolbarHeight;
+
             focusOnPage(0);
-            
             updateHitRegions(); 
         }
         
@@ -534,18 +567,14 @@
             }
         }
 
-        // New Helper: Calculate Canvas Bounds (Center of First Page to Center of Last Page)
         function getCanvasBounds() {
             const winW = window.innerWidth;
             const zoom = canvas.getZoom();
-            // Bound Left: When Page 0 is centered
             const maxLeft = (winW / 2) - (SCREEN_WIDTH * zoom / 2);
-            // Bound Right: When Last Page is centered
             const minLeft = (winW / 2) - ((screenCount * SCREEN_WIDTH - SCREEN_WIDTH/2) * zoom);
             return { min: minLeft, max: maxLeft };
         }
 
-        // New Helper: Snap Back Animation
         function snapBack() {
             const bounds = getCanvasBounds();
             const currentX = canvas.viewportTransform[4];
@@ -553,7 +582,7 @@
 
             if (currentX > bounds.max) targetX = bounds.max;
             else if (currentX < bounds.min) targetX = bounds.min;
-            else return; // Inside bounds, no snap needed
+            else return; 
 
             fabric.util.animate({
                 startValue: currentX,
@@ -576,7 +605,6 @@
             const evt = opt.e;
             const target = opt.target;
 
-            // Momentum: Stop previous animation
             cancelAnimationFrame(momentumID);
             velocityX = 0; velocityY = 0;
             lastMoveTime = Date.now();
@@ -664,7 +692,6 @@
                 let deltaX = pos.x - lastX;
                 let deltaY = pos.y - lastY;
 
-                // Momentum: Calculate velocity
                 if (dt > 0) {
                     const newVx = deltaX / dt;
                     const newVy = deltaY / dt;
@@ -677,31 +704,25 @@
                     clearTimeout(longPressTimer);
                 }
 
-                const visualHeight = SCREEN_HEIGHT * canvas.getZoom();
-                const availableHeight = window.innerHeight - (document.querySelector('.bottom-bar').offsetHeight + 30);
-                
-                if (visualHeight <= availableHeight) {
+                // V105 Optimization: Use cached layout state
+                if (layoutState.visualHeight <= layoutState.availableHeight) {
                     deltaY = 0; 
                     velocityY = 0; 
                 }
 
-                // --- V102-RubberBand: Damping Logic ---
                 const bounds = getCanvasBounds();
                 const currentX = canvas.viewportTransform[4];
                 const proposedX = currentX + deltaX;
 
                 if (proposedX > bounds.max) {
-                     // Dragging Right (Past Page 0)
                      const overage = proposedX - bounds.max;
                      const resistance = 1 / (1 + Math.abs(overage) * 0.003); 
                      deltaX *= resistance;
                 } else if (proposedX < bounds.min) {
-                     // Dragging Left (Past Last Page)
                      const overage = bounds.min - proposedX;
                      const resistance = 1 / (1 + Math.abs(overage) * 0.003);
                      deltaX *= resistance;
                 }
-                // --------------------------------------
 
                 canvas.relativePan({ x: deltaX, y: deltaY });
                 updateSideBarPosition();
@@ -736,7 +757,6 @@
                     velocityY = 0;
                 }
                 
-                // --- V102-RubberBand: Check for SnapBack immediately ---
                 const bounds = getCanvasBounds();
                 const currentX = canvas.viewportTransform[4];
                 
@@ -746,7 +766,6 @@
                 } else {
                     applyMomentum();
                 }
-                // ----------------------------------------------------
             }
 
             isDraggingCanvas = false;
@@ -773,13 +792,11 @@
                 let panX = velocityX * 16; 
                 let panY = velocityY * 16;
 
-                const visualHeight = SCREEN_HEIGHT * canvas.getZoom();
-                const availableHeight = window.innerHeight - (document.querySelector('.bottom-bar').offsetHeight + 30);
-                if (visualHeight <= availableHeight) {
+                // V105: Use Cached Layout
+                if (layoutState.visualHeight <= layoutState.availableHeight) {
                     panY = 0;
                 }
 
-                // --- V102-RubberBand: Momentum Boundary Check ---
                 const bounds = getCanvasBounds();
                 const currentX = canvas.viewportTransform[4];
                 const proposedX = currentX + panX;
@@ -789,7 +806,6 @@
                     snapBack();
                     return;
                 }
-                // ------------------------------------------------
 
                 canvas.relativePan({ x: panX, y: panY });
                 updateSideBarPosition();
@@ -1066,13 +1082,11 @@
             triggerAutoSave();
         }
 
-        // V102: Focus on Page Functionality
         function addScreen() { 
             screenCount++; 
             updateWorkspace(); 
             canvas.requestRenderAll(); 
             triggerAutoSave(); 
-            // Focus on the new page (index = count - 1)
             focusOnPage(screenCount - 1);
         }
         function removeScreen() { 
@@ -1081,7 +1095,6 @@
                 updateWorkspace(); 
                 canvas.requestRenderAll(); 
                 triggerAutoSave(); 
-                // Focus on the last remaining page
                 focusOnPage(screenCount - 1);
             } 
         }
@@ -1100,12 +1113,14 @@
             }
         }
 
-        function handleFiles(files) {
-            if (!files || !files[0]) return;
-            const center = canvas.getVpCenter();
-            Array.from(files).forEach(file => {
-                const reader = new FileReader();
-                reader.onload = (f) => {
+        // V105 Optimization: Process Image Helper
+        function processImageFile(file, isBackground = false) {
+            const reader = new FileReader();
+            reader.onload = (f) => {
+                if (isBackground) {
+                    applyPattern(f.target.result);
+                } else {
+                    const center = canvas.getVpCenter();
                     fabric.Image.fromURL(f.target.result, (img) => {
                         if (img.width > SCREEN_WIDTH) img.scaleToWidth(SCREEN_WIDTH * 0.8);
                         const offsetX = (Math.random() * 40 - 20);
@@ -1118,17 +1133,20 @@
                         triggerAutoSave();
                         canvas.requestRenderAll(); 
                     });
-                };
-                reader.readAsDataURL(file);
-            });
+                }
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function handleFiles(files) {
+            if (!files || !files[0]) return;
+            Array.from(files).forEach(file => processImageFile(file, false));
             document.getElementById('file-input').value = '';
         }
 
         function handleBgFile(files) {
             if (!files || !files[0]) return;
-            const reader = new FileReader();
-            reader.onload = function(f) { applyPattern(f.target.result); };
-            reader.readAsDataURL(files[0]);
+            processImageFile(files[0], true);
             document.getElementById('bg-file-input').value = '';
         }
 
@@ -1145,11 +1163,13 @@
             });
         }
 
-        let ctxLines = [];
+        // V105 Optimization: Rendering Lines Array (No more Objects)
+        let renderingLines = [];
+
         canvas.on('object:moving', function(e) {
             const obj = e.target;
             const threshold = 15; 
-            ctxLines.forEach(line => canvas.remove(line)); ctxLines = [];
+            renderingLines = []; // Clear array, not canvas objects
             
             const objCenter = obj.getCenterPoint();
             let finalX = objCenter.x;
@@ -1163,12 +1183,12 @@
 
             if (Math.abs(objCenter.x - screenCenterX) < threshold) {
                 finalX = screenCenterX;
-                drawGuideline(screenCenterX, 0, screenCenterX, SCREEN_HEIGHT);
+                renderingLines.push({x1: screenCenterX, y1: 0, x2: screenCenterX, y2: SCREEN_HEIGHT});
                 snappedX = true;
             }
             if (Math.abs(objCenter.y - screenCenterY) < threshold) {
                 finalY = screenCenterY;
-                drawGuideline(pageIndex * SCREEN_WIDTH, screenCenterY, (pageIndex + 1) * SCREEN_WIDTH, screenCenterY);
+                renderingLines.push({x1: pageIndex * SCREEN_WIDTH, y1: screenCenterY, x2: (pageIndex + 1) * SCREEN_WIDTH, y2: screenCenterY});
                 snappedY = true;
             }
 
@@ -1178,12 +1198,22 @@
                     const tCenter = target.getCenterPoint();
                     if (!snappedX && Math.abs(objCenter.x - tCenter.x) < threshold) {
                         finalX = tCenter.x;
-                        drawGuideline(tCenter.x, Math.min(obj.top, target.top)-50, tCenter.x, Math.max(obj.top+obj.height*obj.scaleY, target.top+target.height*target.scaleY)+50);
+                        renderingLines.push({
+                            x1: tCenter.x, 
+                            y1: Math.min(obj.top, target.top)-50, 
+                            x2: tCenter.x, 
+                            y2: Math.max(obj.top+obj.height*obj.scaleY, target.top+target.height*target.scaleY)+50
+                        });
                         snappedX = true;
                     }
                     if (!snappedY && Math.abs(objCenter.y - tCenter.y) < threshold) {
                         finalY = tCenter.y;
-                        drawGuideline(Math.min(obj.left, target.left)-50, tCenter.y, Math.max(obj.left+obj.width*obj.scaleX, target.left+target.width*target.scaleX)+50, tCenter.y);
+                        renderingLines.push({
+                            x1: Math.min(obj.left, target.left)-50, 
+                            y1: tCenter.y, 
+                            x2: Math.max(obj.left+obj.width*obj.scaleX, target.left+target.width*target.scaleX)+50, 
+                            y2: tCenter.y
+                        });
                         snappedY = true;
                     }
                 });
@@ -1193,18 +1223,27 @@
         });
         
         canvas.on('mouse:up', function() { 
-            ctxLines.forEach(line => canvas.remove(line)); 
-            ctxLines = []; 
+            renderingLines = []; // Just clear the data array
             canvas.requestRenderAll(); 
         });
 
-        function drawGuideline(x1, y1, x2, y2) {
-            const line = new fabric.Line([x1, y1, x2, y2], { 
-                stroke: '#ff0077', strokeWidth: 1, strokeDashArray: [4, 4], 
-                selectable: false, evented: false, excludeFromExport: true 
+        // V105 Optimization: Direct Draw on Context
+        canvas.on('after:render', function(opt) {
+            if(renderingLines.length === 0) return;
+            const ctx = canvas.getContext();
+            ctx.save();
+            ctx.setTransform(canvas.viewportTransform[0], canvas.viewportTransform[1], canvas.viewportTransform[2], canvas.viewportTransform[3], canvas.viewportTransform[4], canvas.viewportTransform[5]);
+            ctx.lineWidth = 1;
+            ctx.strokeStyle = '#ff0077';
+            ctx.setLineDash([4, 4]);
+            ctx.beginPath();
+            renderingLines.forEach(l => {
+                ctx.moveTo(l.x1, l.y1);
+                ctx.lineTo(l.x2, l.y2);
             });
-            canvas.add(line); ctxLines.push(line);
-        }
+            ctx.stroke();
+            ctx.restore();
+        });
 
         function initDB() {
             try {
@@ -1304,7 +1343,6 @@
             }
 
             let shareSuccess = false;
-            // V104 Modification: Only attempt share on Mobile devices
             const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
             
             try {
@@ -1319,7 +1357,6 @@
                 }
             } catch (err) { console.log("Share skipped/cancelled", err); }
 
-            // Fallback (or default for Desktop)
             if (!shareSuccess) {
                 statusIndicator.innerText = "开始下载...";
                 for (let i = 0; i < blobs.length; i++) {
