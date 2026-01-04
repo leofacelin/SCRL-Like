@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Spark Canvas - V98 (视觉平衡版)</title>
+    <title>Spark Canvas - V101 (修复版)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
     <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
     
@@ -12,7 +12,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300..900&family=Noto+Serif+SC:wght@300..900&display=swap" rel="stylesheet">
 
     <style>
-        :root { --bg-color: #1e1e1e; --panel-bg: rgba(45, 45, 45, 0.95); --accent-color: #007AFF; --danger-color: #ff453a; --text-color: #fff; --border-color: #444; }
+        :root { --bg-color: #1e1e1e; --panel-bg: rgba(30, 30, 30, 0.85); --accent-color: #007AFF; --danger-color: #ff453a; --text-color: #fff; --border-color: #444; }
         
         html, body { 
             height: 100%; width: 100%; 
@@ -25,8 +25,8 @@
             -webkit-user-select: none; user-select: none;
         }
         
-        #status-indicator { position: fixed; top: 20px; font-size: 11px; color: #666; background: rgba(0,0,0,0.5); padding: 4px 12px; border-radius: 20px; transition: all 0.3s; font-weight: 500; z-index: 10; opacity: 0; pointer-events: none; }
-        #status-indicator.visible { opacity: 1; }
+        #status-indicator { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); font-size: 11px; color: #aaa; background: rgba(30,30,30,0.6); backdrop-filter: blur(10px); padding: 6px 16px; border-radius: 20px; transition: all 0.3s; font-weight: 500; z-index: 10; opacity: 0; pointer-events: none; border: 1px solid rgba(255,255,255,0.1); }
+        #status-indicator.visible { opacity: 1; top: 30px; }
         .status-saved { color: #32D74B !important; } .status-saving { color: #FFD700 !important; }
 
         #canvas-wrapper { 
@@ -41,89 +41,145 @@
         .canvas-container { margin: 0 auto; background: transparent !important; }
         canvas { background: transparent !important; }
 
-        .toolbar { 
+        /* --- V101: Side Bar (Fixed positioning logic) --- */
+        .side-bar {
+            position: fixed; 
+            /* left set by JS */
+            top: 50%; transform: translateY(-50%);
+            display: flex; flex-direction: column; gap: 12px;
+            z-index: 90;
+            /* Remove transition to make it stick perfectly during drag */
+        }
+        .side-btn {
+            width: 44px; height: 44px; border-radius: 50%;
+            background: var(--panel-bg); backdrop-filter: blur(20px);
+            border: 1px solid rgba(255,255,255,0.1);
+            color: #ddd; font-size: 20px; display: flex; align-items: center; justify-content: center;
+            cursor: pointer; transition: all 0.2s;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+        .side-btn:hover { background: #444; color: #fff; transform: scale(1.1); }
+        .side-btn:active { transform: scale(0.95); }
+        .side-btn i { pointer-events: none; }
+
+        /* --- Bottom Bar --- */
+        .bottom-bar {
             position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
-            background: var(--panel-bg); padding: 8px 16px; 
-            border-radius: 24px; display: flex; 
-            min-width: 320px; max-width: 95vw;
-            justify-content: space-between; 
-            box-shadow: 0 10px 40px rgba(0,0,0,0.5); backdrop-filter: blur(20px); 
-            z-index: 100; border: 1px solid rgba(255,255,255,0.15); 
-            box-sizing: border-box;
-            padding-bottom: env(safe-area-inset-bottom, 8px); 
-            margin-bottom: env(safe-area-inset-bottom, 0); 
-        }
-        .tool-group { display: flex; gap: 8px; align-items: center; }
-        
-        button { 
-            background: rgba(255,255,255,0.1); color: #ddd; border: none; 
-            width: 44px; height: 44px; padding: 0; border-radius: 12px; cursor: pointer; 
-            font-size: 20px; transition: all 0.2s; 
-            display: flex; align-items: center; justify-content: center; 
-            flex-shrink: 0; 
-        }
-        button:hover { background: rgba(255,255,255,0.2); color: white; transform: translateY(-2px); }
-        button:active { transform: scale(0.92); }
-        button.primary { background: var(--accent-color); color: white; }
-        button.danger { background: rgba(255, 69, 58, 0.15); color: var(--danger-color); }
-        
-        button i, .font-select-btn i, .layer-btn i, .control-btn i { pointer-events: none; }
-        button i { font-size: 22px; }
-
-        .font-select-wrapper { position: relative; width: 44px; height: 44px; }
-        .font-select-btn { 
-            position: absolute; top:0; left:0; width: 100%; height: 100%; 
-            background: rgba(255,255,255,0.1); border-radius: 12px; 
-            display: flex; align-items: center; justify-content: center; 
-            color: #ddd; font-weight: bold; font-size: 16px; pointer-events: none; 
-        }
-        .font-select-btn i { font-size: 22px; }
-        select.font-select {
-            opacity: 0; width: 100%; height: 100%; cursor: pointer; 
-            position: absolute; top:0; left:0; -webkit-appearance: none;
+            display: flex; gap: 40px; align-items: center;
+            padding: 0 20px;
+            z-index: 100;
+            padding-bottom: env(safe-area-inset-bottom, 0);
+            margin-bottom: env(safe-area-inset-bottom, 0);
         }
 
-        #bg-panel { display: none; position: absolute; bottom: 90px; left: 50%; transform: translateX(-50%); background: rgba(30, 30, 30, 0.95); backdrop-filter: blur(20px); border: 1px solid #444; border-radius: 16px; padding: 15px; box-shadow: 0 10px 40px rgba(0,0,0,0.8); z-index: 90; animation: panelUp 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275); width: 220px; padding-bottom: env(safe-area-inset-bottom, 15px); }
+        .bar-btn-group { position: relative; }
+
+        .main-btn {
+            width: 56px; height: 56px; border-radius: 50%;
+            background: var(--panel-bg); backdrop-filter: blur(20px);
+            border: 1px solid rgba(255,255,255,0.15);
+            color: #fff; font-size: 24px;
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer; transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+        }
+        .main-btn:hover { transform: translateY(-4px); border-color: rgba(255,255,255,0.3); }
+        .main-btn:active { transform: scale(0.95); }
+        .main-btn.accent { background: var(--accent-color); border: none; }
+        .main-btn i { pointer-events: none; }
+
+        /* Add Popover Menu */
+        #add-popover {
+            position: absolute; bottom: 70px; left: 50%; transform: translateX(-50%) scale(0.8);
+            background: rgba(40,40,40,0.95); backdrop-filter: blur(20px);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 16px; padding: 8px;
+            display: flex; flex-direction: column; gap: 8px;
+            opacity: 0; pointer-events: none; transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+            width: 120px;
+        }
+        #add-popover.active { opacity: 1; pointer-events: auto; transform: translateX(-50%) scale(1); }
+        
+        .pop-item {
+            display: flex; align-items: center; gap: 10px;
+            padding: 10px 12px; border-radius: 8px;
+            color: #eee; cursor: pointer; transition: background 0.2s;
+            font-size: 14px; font-weight: 500;
+        }
+        .pop-item:hover { background: rgba(255,255,255,0.1); color: #fff; }
+        .pop-item i { font-size: 18px; }
+
+        /* --- Panels --- */
+        #bg-panel { display: none; position: absolute; bottom: 100px; left: 50%; transform: translateX(-50%); background: rgba(30, 30, 30, 0.95); backdrop-filter: blur(20px); border: 1px solid #444; border-radius: 16px; padding: 15px; box-shadow: 0 10px 40px rgba(0,0,0,0.8); z-index: 90; animation: panelUp 0.2s; width: 240px; }
         @keyframes panelUp { from { opacity: 0; transform: translate(-50%, 20px); } to { opacity: 1; transform: translate(-50%, 0); } }
         .panel-title { font-size: 12px; color: #888; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 1px; text-align: center; }
         .bg-options { display: flex; justify-content: space-between; gap: 10px; align-items: center; }
         .bg-option { width: 48px; height: 48px; border-radius: 8px; border: 2px solid #555; cursor: pointer; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; background-size: cover; background-position: center; transition: all 0.2s; }
         .bg-option:hover { border-color: #fff; transform: scale(1.05); }
         .bg-option.add-btn { border: 2px dashed #666; color: #666; font-size: 24px; }
-        .bg-option.add-btn:hover { border-color: var(--accent-color); color: var(--accent-color); }
         .color-input-wrapper { background: conic-gradient(red, yellow, lime, cyan, blue, magenta, red); }
         input[type="color"] { opacity: 0; width: 100%; height: 100%; cursor: pointer; position: absolute; top:0; left:0; }
         .bg-preset-grid { width: 48px; height: 48px; display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr); gap: 4px; padding: 2px; background: rgba(255,255,255,0.05); border-radius: 8px; box-sizing: border-box; }
         .preset-dot { width: 100%; height: 100%; border-radius: 50%; cursor: pointer; border: 1px solid rgba(255,255,255,0.1); transition: transform 0.2s; }
         .preset-dot:hover { transform: scale(1.4); border-color: white; z-index: 2; box-shadow: 0 2px 5px rgba(0,0,0,0.5); }
 
-        #context-menu { display: none; position: absolute; z-index: 2000; width: 140px; background: rgba(40, 40, 40, 0.98); backdrop-filter: blur(20px); border: 1px solid #555; border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.8); padding: 4px; animation: menuFadeIn 0.15s ease-out; }
+        #context-menu { display: none; position: absolute; z-index: 2000; width: 160px; background: rgba(40, 40, 40, 0.98); backdrop-filter: blur(20px); border: 1px solid #555; border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.8); padding: 4px; animation: menuFadeIn 0.15s ease-out; }
         @keyframes menuFadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
         
         .menu-header { font-size: 9px; color: #888; padding: 3px 6px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 2px; display: none; }
         .layer-controls { display: flex; justify-content: space-between; background: rgba(255,255,255,0.05); border-radius: 8px; padding: 3px; margin-bottom: 4px; }
         .layer-btn { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border-radius: 6px; cursor: pointer; font-size: 16px; color: #ccc; }
         .layer-btn:hover { background: #555; color: white; }
-        .menu-item { display: none; align-items: center; padding: 8px 8px; font-size: 11px; color: #eee; cursor: pointer; border-radius: 6px; transition: background 0.1s; margin-bottom: 1px; }
+        .menu-item { display: none; align-items: center; padding: 8px 8px; font-size: 12px; color: #eee; cursor: pointer; border-radius: 6px; transition: background 0.1s; margin-bottom: 1px; }
         .menu-item:hover, .menu-item:active { background: var(--accent-color); color: white; }
         .menu-item.delete { color: var(--danger-color); margin-top: 4px; border-top: 1px solid #555; border-radius: 0 0 8px 8px; }
         .menu-item.delete:hover { background: var(--danger-color); color: white; }
-        .menu-icon-span { width: 20px; text-align: center; margin-right: 4px; font-size: 14px; vertical-align: middle; }
+        .menu-icon-span { width: 20px; text-align: center; margin-right: 6px; font-size: 16px; vertical-align: middle; }
 
         .text-colors-container { display: flex; gap: 4px; padding: 4px; justify-content: space-around; border-bottom: 1px solid #555; margin-bottom: 4px; }
-        .text-color-dot { width: 14px; height: 14px; border-radius: 50%; cursor: pointer; border: 1px solid rgba(255,255,255,0.2); transition: transform 0.2s; }
+        .text-color-dot { width: 16px; height: 16px; border-radius: 50%; cursor: pointer; border: 1px solid rgba(255,255,255,0.2); transition: transform 0.2s; }
         .text-color-dot:hover { transform: scale(1.2); border-color: white; }
 
         .align-toolbar { display: flex; gap: 3px; background: rgba(255,255,255,0.05); border-radius: 8px; padding: 3px; margin-bottom: 4px; }
         .align-btn { flex: 1; text-align: center; padding: 5px 0; font-size: 16px; color: #ccc; cursor: pointer; border-radius: 6px; font-weight: bold; letter-spacing: 0; }
         .align-btn:hover { background: #555; color: white; }
 
-        .control-row { display: none; justify-content: space-between; align-items: center; padding: 4px 8px; color: #ccc; font-size: 11px; margin-bottom: 1px; }
-        .control-label { flex-grow: 1; opacity: 0.8; }
+        .control-row { display: none; justify-content: space-between; align-items: center; padding: 4px 8px; color: #ccc; font-size: 12px; margin-bottom: 1px; }
+        .control-label { flex-grow: 1; opacity: 0.8; font-size: 11px; }
         .control-group { display: flex; gap: 4px; }
         .control-btn { background: rgba(255,255,255,0.1); border-radius: 4px; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background 0.2s; font-weight: bold; color: #ddd; font-size: 14px; }
         .control-btn:hover { background: #555; color: white; }
         .control-btn:active { transform: scale(0.9); }
+
+        /* V101: Independent Font List Popup */
+        .font-selector-row { display: none; padding: 2px; margin-bottom: 4px; }
+        .font-toggle-btn {
+            display: flex; justify-content: space-between; align-items: center;
+            width: 100%; padding: 8px 8px;
+            background: rgba(255,255,255,0.05); border-radius: 8px;
+            cursor: pointer; color: #ddd; font-size: 12px;
+        }
+        .font-toggle-btn:hover { background: rgba(255,255,255,0.1); color: white; }
+        
+        /* New Detached Font Menu */
+        .font-options-list {
+            display: none; flex-direction: column; gap: 4px;
+            position: absolute; left: 105%; top: 120px; /* Positioned to the right of context menu */
+            background: rgba(40, 40, 40, 0.98); backdrop-filter: blur(20px);
+            border: 1px solid #555; border-radius: 12px;
+            padding: 6px; min-width: 100px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.8);
+            z-index: 2001; /* Above context menu */
+        }
+        .font-options-list.active { display: flex; }
+        
+        .font-option {
+            padding: 8px 12px; font-size: 14px; color: #ccc;
+            cursor: pointer; border-radius: 6px;
+            text-align: left; white-space: nowrap;
+        }
+        .font-option:hover { background: var(--accent-color); color: white; }
 
         .show-always { display: flex !important; } 
         .show-header { display: block !important; }
@@ -145,6 +201,30 @@
 <body>
     <div id="status-indicator">准备就绪</div>
     <div id="canvas-wrapper"><canvas id="c"></canvas></div>
+
+    <div class="side-bar">
+        <div class="side-btn" onclick="addScreen()" title="增加页面"><i class="ri-file-add-line"></i></div>
+        <div class="side-btn" onclick="removeScreen()" title="删除页面"><i class="ri-delete-back-2-line"></i></div>
+    </div>
+
+    <div class="bottom-bar">
+        <div class="bar-btn-group">
+            <div id="add-popover">
+                <div class="pop-item" onclick="document.getElementById('file-input').click(); toggleAddMenu(false)"><i class="ri-image-add-line"></i> 添加图片</div>
+                <div class="pop-item" onclick="addText(); toggleAddMenu(false)"><i class="ri-text"></i> 添加文字</div>
+            </div>
+            <div class="main-btn accent" onclick="toggleAddMenu()" title="添加内容"><i class="ri-add-line"></i></div>
+        </div>
+
+        <div class="bar-btn-group">
+            <div class="main-btn" onclick="toggleBgPanel()" title="背景设置"><i class="ri-palette-line"></i></div>
+        </div>
+
+        <div class="bar-btn-group" style="display:flex; gap: 10px;">
+            <div class="main-btn danger" onclick="showModal()" style="width:44px; height:44px; font-size:20px;" title="清空"><i class="ri-delete-bin-line"></i></div>
+            <div class="main-btn" onclick="exportContent()" title="导出"><i class="ri-download-2-line"></i></div>
+        </div>
+    </div>
 
     <div id="bg-panel">
         <div class="panel-title">背景设置</div>
@@ -197,6 +277,18 @@
         <div class="menu-item image-menu-item" onclick="menuAction('shadow')"><i class="menu-icon-span ri-drop-line"></i> 投影</div>
 
         <div class="menu-header text-menu-item">文字设置</div>
+        
+        <div class="font-selector-row text-menu-item">
+            <div class="font-toggle-btn" onclick="toggleFontList()">
+                <span>字体 Font</span> <i class="ri-arrow-right-s-line" id="font-arrow-icon"></i>
+            </div>
+        </div>
+        
+        <div id="font-options-wrapper" class="font-options-list">
+            <div class="font-option" style="font-family: 'Noto Sans SC', sans-serif" onclick="changeFont('\'Noto Sans SC\', sans-serif')">思源黑体</div>
+            <div class="font-option" style="font-family: 'Noto Serif SC', serif" onclick="changeFont('\'Noto Serif SC\', serif')">思源宋体</div>
+        </div>
+
         <div class="text-colors-container text-menu-item">
             <div class="text-color-dot" style="background: #000000" onclick="changeTextColor('#000000')"></div>
             <div class="text-color-dot" style="background: #ffffff" onclick="changeTextColor('#ffffff')"></div>
@@ -236,31 +328,6 @@
 
         <div class="menu-item show-always" onclick="menuAction('duplicate')"><i class="menu-icon-span ri-file-copy-line"></i> 复制</div>
         <div class="menu-item delete show-always" onclick="menuAction('delete')"><i class="menu-icon-span ri-delete-bin-line"></i> 删除</div>
-    </div>
-
-    <div class="toolbar">
-        <div class="tool-group">
-            <button onclick="document.getElementById('file-input').click()" class="primary" title="添加图片"><i class="ri-image-add-line"></i></button>
-            <button onclick="addText()" title="添加文字"><i class="ri-text"></i></button>
-            <div class="font-select-wrapper" title="选择字体">
-                <div class="font-select-btn"><i class="ri-font-size-2"></i></div>
-                <select id="font-family-selector" class="font-select" onchange="changeFont(this.value)">
-                    <option value="'Noto Sans SC', sans-serif">思源黑</option>
-                    <option value="'Noto Serif SC', serif">思源宋</option>
-                </select>
-            </div>
-        </div>
-        
-        <div class="tool-group">
-            <button onclick="removeScreen()" title="减少页面"><i class="ri-file-reduce-line"></i></button>
-            <button onclick="addScreen()" title="增加页面"><i class="ri-file-add-line"></i></button>
-        </div>
-
-        <div class="tool-group">
-            <button onclick="toggleBgPanel()" title="背景设置"><i class="ri-palette-line"></i></button>
-            <button class="danger" onclick="showModal()" title="清空"><i class="ri-delete-bin-2-line"></i></button>
-            <button class="primary" onclick="exportContent()" title="导出"><i class="ri-download-2-line"></i></button>
-        </div>
     </div>
     
     <input type="file" id="file-input" accept="image/*" multiple onchange="handleFiles(this.files)">
@@ -319,7 +386,8 @@
         const bgPanel = document.getElementById('bg-panel');
         const statusIndicator = document.getElementById('status-indicator');
         const confirmModal = document.getElementById('confirm-modal');
-        const fontSelector = document.getElementById('font-family-selector');
+        const addPopover = document.getElementById('add-popover');
+        const sideBar = document.querySelector('.side-bar');
 
         const DB_NAME = "SparkCanvasDB"; const STORE_NAME = "sessions";
         let db; let saveTimeout;
@@ -361,7 +429,16 @@
             isInternalUpdate = false;
         }
 
-        // V98: Visual Balancing Logic (Toolbar subtraction)
+        // V101: Separate Update Sidebar logic
+        function updateSideBarPosition() {
+            const vpt = canvas.viewportTransform;
+            if(!vpt) return;
+            const zoom = canvas.getZoom();
+            // Calculate visual right edge of the content
+            const contentRightEdge = vpt[4] + (screenCount * SCREEN_WIDTH * zoom);
+            sideBar.style.left = (contentRightEdge + 15) + 'px'; 
+        }
+
         function initViewport() {
             const winW = window.innerWidth;
             const winH = window.innerHeight;
@@ -369,16 +446,12 @@
             canvas.setWidth(winW);
             canvas.setHeight(winH);
 
-            // Measure Toolbar Height dynamically + Padding
-            const toolbar = document.querySelector('.toolbar');
-            // Bottom gap (30px) + Toolbar Height + Top padding (20px) = Dead Space
+            const toolbar = document.querySelector('.bottom-bar');
             const toolbarHeight = toolbar ? toolbar.offsetHeight + 50 : 100;
             
-            // Available "Visual" Space
-            const safeW = winW - 40; 
-            const safeH = winH - toolbarHeight - 20; // 20px top padding
+            const safeW = winW - 60; 
+            const safeH = winH - toolbarHeight - 20; 
             
-            // Calculate Fit Zoom
             const scaleX = safeW / SCREEN_WIDTH;
             const scaleY = safeH / SCREEN_HEIGHT;
             let zoom = Math.min(scaleX, scaleY);
@@ -388,27 +461,24 @@
             canvas.setZoom(zoom);
 
             const vpt = canvas.viewportTransform;
-            // Center X
             vpt[4] = (winW - SCREEN_WIDTH * zoom) / 2;
             
-            // Center Y (Visually Balanced)
-            // Calculate center point of the "Safe Area" above toolbar
             const visualSpaceCenterY = (winH - toolbarHeight) / 2;
             const contentHalfHeight = (SCREEN_HEIGHT * zoom) / 2;
             
-            vpt[5] = visualSpaceCenterY - contentHalfHeight + 20; // +20 top margin safety
+            vpt[5] = visualSpaceCenterY - contentHalfHeight + 20; 
             
             updateHitRegions(); 
             canvas.requestRenderAll();
+            updateSideBarPosition(); // Initial update
         }
         
         function updateHitRegions() {
             canvas.forEachObject(obj => obj.setCoords());
         }
 
-        // V98: Dynamic Resizing
         window.addEventListener('resize', () => {
-            initViewport(); // Re-calculate everything on resize
+            initViewport(); 
         });
 
         setTimeout(() => {
@@ -451,6 +521,10 @@
             const evt = opt.e;
             const target = opt.target;
 
+            if (addPopover.classList.contains('active')) {
+                toggleAddMenu(false);
+            }
+
             if (opt.button === 3) {
                 if (target && target !== bgRect) {
                     canvas.setActiveObject(target);
@@ -466,12 +540,15 @@
             if (contextMenu.style.display === 'block' && opt.button !== 3) {
                 if (!target || target === bgRect) {
                     contextMenu.style.display = 'none';
+                    document.getElementById('font-options-wrapper').classList.remove('active');
+                    document.getElementById('font-arrow-icon').className = "ri-arrow-right-s-line";
                 } else {
                     const currentType = getBroadType(target.type);
                     const menuType = contextMenu.dataset.currentType; 
                     
                     if (currentType !== menuType) {
                         contextMenu.style.display = 'none';
+                        document.getElementById('font-options-wrapper').classList.remove('active');
                     } else {
                         updateContextMenuState(target);
                     }
@@ -510,6 +587,7 @@
                 }, 500);
             } else if (!target || target === bgRect) {
                 contextMenu.style.display = 'none';
+                document.getElementById('font-options-wrapper').classList.remove('active');
             }
         });
 
@@ -527,16 +605,16 @@
                     clearTimeout(longPressTimer);
                 }
 
-                // V98: Adaptive Rail (Respected Visual Height)
-                // Use actual visual height for locking check
                 const visualHeight = SCREEN_HEIGHT * canvas.getZoom();
-                const availableHeight = window.innerHeight - (document.querySelector('.toolbar').offsetHeight + 30);
+                const availableHeight = window.innerHeight - (document.querySelector('.bottom-bar').offsetHeight + 30);
                 
                 if (visualHeight <= availableHeight) {
                     deltaY = 0; 
                 }
 
                 canvas.relativePan({ x: deltaX, y: deltaY });
+                updateSideBarPosition(); // V101: Move sidebar with canvas dragging
+                
                 lastX = pos.x;
                 lastY = pos.y;
             } else {
@@ -564,11 +642,11 @@
             isObjectMoving = false;
             clearTimeout(longPressTimer);
             canvas.setViewportTransform(canvas.viewportTransform); 
+            // V101 Fix: REMOVED initViewport() call from here!
             updateHitRegions(); 
         });
 
         canvas.on('mouse:wheel', function(opt) {
-            // V97: Fixed Viewport - Disable Mouse Wheel Zoom
             opt.e.preventDefault();
             opt.e.stopPropagation();
         });
@@ -592,7 +670,6 @@
                     pinchMode = 'object';
                     initialObjectScale = target.scaleX;
                 } else {
-                    // V97: Fixed Viewport - Disable Canvas Pinch Zoom
                     pinchMode = null; 
                 }
                 e.preventDefault();
@@ -700,6 +777,8 @@
             
             if (!keepOpen.includes(action)) {
                 contextMenu.style.display = 'none';
+                document.getElementById('font-options-wrapper').classList.remove('active');
+                document.getElementById('font-arrow-icon').className = "ri-arrow-right-s-line";
             }
         }
 
@@ -715,12 +794,16 @@
             contextMenu.dataset.currentType = getBroadType(type);
             updateContextMenuState(target);
 
+            // Reset font menu state
+            document.getElementById('font-options-wrapper').classList.remove('active');
+            document.getElementById('font-arrow-icon').className = "ri-arrow-right-s-line";
+
             if (type === 'image') {
                 imageItems.forEach(el => el.style.display = 'flex');
                 textItems.forEach(el => el.style.display = 'none');
             } else if (type === 'i-text' || type === 'text') {
                 imageItems.forEach(el => el.style.display = 'none');
-                textItems.forEach(el => el.style.display = 'flex');
+                textItems.forEach(el => el.style.display = 'flex'); 
             } else {
                 imageItems.forEach(el => el.style.display = 'none');
                 textItems.forEach(el => el.style.display = 'none');
@@ -751,6 +834,27 @@
             bgPanel.style.display = 'none';
         }
 
+        function toggleAddMenu(forceState) {
+            if (forceState === undefined) {
+                addPopover.classList.toggle('active');
+            } else if (forceState) {
+                addPopover.classList.add('active');
+            } else {
+                addPopover.classList.remove('active');
+            }
+        }
+
+        function toggleFontList() {
+            const list = document.getElementById('font-options-wrapper');
+            const arrow = document.getElementById('font-arrow-icon');
+            list.classList.toggle('active');
+            if(list.classList.contains('active')) {
+                arrow.className = "ri-arrow-left-s-line";
+            } else {
+                arrow.className = "ri-arrow-right-s-line";
+            }
+        }
+
         function showModal() { confirmModal.style.display = 'block'; }
         function closeModal() { confirmModal.style.display = 'none'; }
         
@@ -774,6 +878,7 @@
                 activeObj.set("fontWeight", 600);
                 canvas.requestRenderAll();
                 triggerAutoSave();
+                toggleFontList();
             }
         }
 
@@ -788,7 +893,7 @@
 
         function addText() {
             const center = canvas.getVpCenter();
-            const selectedFont = document.getElementById('font-family-selector').value;
+            const selectedFont = "'Noto Sans SC', sans-serif";
             const text = new fabric.IText('双击编辑', {
                 left: center.x, top: center.y,
                 fontFamily: selectedFont, 
@@ -813,6 +918,7 @@
             updateWorkspace(); 
             canvas.requestRenderAll(); 
             triggerAutoSave(); 
+            updateSideBarPosition();
         }
         function removeScreen() { 
             if (screenCount > 1) { 
@@ -820,6 +926,7 @@
                 updateWorkspace(); 
                 canvas.requestRenderAll(); 
                 triggerAutoSave(); 
+                updateSideBarPosition();
             } 
         }
 
@@ -837,7 +944,6 @@
             }
         }
 
-        // V97 Fix: handleFiles robust check + manual render
         function handleFiles(files) {
             if (!files || !files[0]) return;
             const center = canvas.getVpCenter();
@@ -854,7 +960,7 @@
                         canvas.setActiveObject(img); 
                         bringGridToFront(); 
                         triggerAutoSave();
-                        canvas.requestRenderAll(); // Force render to prevent invisible image bug
+                        canvas.requestRenderAll(); 
                     });
                 };
                 reader.readAsDataURL(file);
@@ -886,7 +992,7 @@
         let ctxLines = [];
         canvas.on('object:moving', function(e) {
             const obj = e.target;
-            const threshold = 15; // V95: Snapping fix
+            const threshold = 15; 
             ctxLines.forEach(line => canvas.remove(line)); ctxLines = [];
             
             const objCenter = obj.getCenterPoint();
@@ -912,7 +1018,6 @@
 
             if (!snappedX || !snappedY) {
                 canvas.getObjects().forEach(target => {
-                    // V95: Fixed guideline logic
                     if (target === obj || target === bgRect || target.excludeFromExport || !target.visible) return;
                     const tCenter = target.getCenterPoint();
                     if (!snappedX && Math.abs(objCenter.x - tCenter.x) < threshold) {
@@ -928,26 +1033,21 @@
                 });
             }
             obj.setPositionByOrigin(new fabric.Point(finalX, finalY), 'center', 'center');
-            canvas.requestRenderAll(); // V95: Force render lines
+            canvas.requestRenderAll();
         });
         
         canvas.on('mouse:up', function() { 
             ctxLines.forEach(line => canvas.remove(line)); 
             ctxLines = []; 
-            canvas.requestRenderAll(); // V95: Clear lines visual
+            canvas.requestRenderAll(); 
         });
 
         function drawGuideline(x1, y1, x2, y2) {
             const line = new fabric.Line([x1, y1, x2, y2], { 
-                stroke: '#ff0077', 
-                strokeWidth: 1, 
-                strokeDashArray: [4, 4], 
-                selectable: false, 
-                evented: false, 
-                excludeFromExport: true 
+                stroke: '#ff0077', strokeWidth: 1, strokeDashArray: [4, 4], 
+                selectable: false, evented: false, excludeFromExport: true 
             });
-            canvas.add(line); 
-            ctxLines.push(line);
+            canvas.add(line); ctxLines.push(line);
         }
 
         function initDB() {
