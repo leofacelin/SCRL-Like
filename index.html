@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Spark Canvas - V105 (自由动量版)</title>
+    <title>Spark Canvas - V104 (原生级滚动)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
     <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
     
@@ -46,7 +46,7 @@
             top: 50%; transform: translateY(-50%);
             display: flex; flex-direction: column; gap: 12px;
             z-index: 90;
-            transition: left 0.1s ease-out; 
+            transition: left 0.1s ease-out; /* Slight transition for smoother follow */
         }
         .side-btn {
             width: 44px; height: 44px; border-radius: 50%;
@@ -442,11 +442,27 @@
             const targetY = visualSpaceCenterY - contentHalfHeight + 20;
 
             const vpt = canvas.viewportTransform;
-            vpt[4] = (winW / 2) - ((index * SCREEN_WIDTH + SCREEN_WIDTH / 2) * zoom);
-            vpt[5] = targetY;
-
-            canvas.requestRenderAll();
-            updateSideBarPosition();
+            
+            // Current Center Target
+            const targetX = (winW / 2) - ((index * SCREEN_WIDTH + SCREEN_WIDTH / 2) * zoom);
+            
+            // Animate Pan
+            fabric.util.animate({
+                startValue: vpt[4],
+                endValue: targetX,
+                duration: 400,
+                onChange: function(value) {
+                    vpt[4] = value;
+                    vpt[5] = targetY; // Ensure vertical center
+                    canvas.requestRenderAll();
+                    updateSideBarPosition();
+                },
+                onComplete: function() {
+                    canvas.setViewportTransform(vpt);
+                    updateHitRegions();
+                },
+                easing: fabric.util.ease.easeOutQuart
+            });
         }
 
         function initViewport() {
@@ -470,8 +486,17 @@
             if (zoom < 0.1) zoom = 0.1;
             canvas.setZoom(zoom);
 
-            focusOnPage(0);
+            // Center initial page
+            const vpt = canvas.viewportTransform;
+            vpt[4] = (winW - SCREEN_WIDTH * zoom) / 2;
+            
+            const visualSpaceCenterY = (winH - toolbarHeight) / 2;
+            const contentHalfHeight = (SCREEN_HEIGHT * zoom) / 2;
+            vpt[5] = visualSpaceCenterY - contentHalfHeight + 20; 
+            
             updateHitRegions(); 
+            canvas.requestRenderAll();
+            updateSideBarPosition(); 
         }
         
         function updateHitRegions() {
@@ -492,6 +517,7 @@
         let mouseDownPoint = {x:0, y:0};
         let mouseDownTarget = null; 
         
+        // V104: Enhanced Physics Variables
         let velocity = { x: 0 };
         let lastTime = 0;
         let animationFrame;
@@ -523,79 +549,11 @@
             }
         }
 
-        // V105: Free Momentum Logic
-        function animateMomentum() {
-            velocity.x *= FRICTION;
-            
-            // Apply movement
-            canvas.relativePan(new fabric.Point(velocity.x, 0));
-            updateSideBarPosition();
-
-            // Stop if too slow
-            if (Math.abs(velocity.x) > 0.5) {
-                animationFrame = requestAnimationFrame(animateMomentum);
-            } else {
-                // Done sliding, check boundaries
-                finalizePosition();
-            }
-        }
-
-        // V105: Edge Snapback (Only if OOB)
-        function finalizePosition() {
-            const vpt = canvas.viewportTransform;
-            const zoom = canvas.getZoom();
-            const winW = window.innerWidth;
-            const contentWidth = screenCount * SCREEN_WIDTH * zoom;
-            
-            // Valid visual range:
-            // Left edge shouldn't be > winW/2 (First page center)
-            // Right edge shouldn't be < winW/2 (Last page center)
-            
-            // Simplified: If first page is entirely to the right of center? No, let's use margins.
-            // Edge logic: 
-            // If dragging RIGHT (seeing left void): vpt[4] > 100
-            // If dragging LEFT (seeing right void): vpt[4] + contentWidth < winW - 100
-            
-            let targetX = vpt[4];
-            let needsSnap = false;
-
-            // Check Left Boundary (First Page)
-            // Let's define "Start": The left edge of first page at screen center minus half page width
-            const leftLimit = (winW / 2) - (SCREEN_WIDTH * zoom / 2);
-            // Check Right Boundary (Last Page)
-            const rightLimit = (winW / 2) - (contentWidth - (SCREEN_WIDTH * zoom / 2));
-
-            if (vpt[4] > leftLimit) {
-                targetX = leftLimit;
-                needsSnap = true;
-            } else if (vpt[4] < rightLimit) {
-                targetX = rightLimit;
-                needsSnap = true;
-            }
-
-            if (needsSnap) {
-                fabric.util.animate({
-                    startValue: vpt[4],
-                    endValue: targetX,
-                    duration: 400,
-                    onChange: function(value) {
-                        vpt[4] = value;
-                        canvas.requestRenderAll();
-                        updateSideBarPosition();
-                    },
-                    onComplete: function() {
-                        canvas.setViewportTransform(vpt);
-                        updateHitRegions();
-                    },
-                    easing: fabric.util.ease.easeOutBack
-                });
-            }
-        }
-
         canvas.on('mouse:down', function(opt) {
             const evt = opt.e;
             const target = opt.target;
 
+            // Stop physics
             cancelAnimationFrame(animationFrame);
             velocity = { x: 0 };
 
@@ -679,11 +637,11 @@
                 
                 let deltaX = pos.x - lastX;
                 
-                // Velocity calc
+                // V104: Velocity Tracking
                 const now = Date.now();
                 const dt = now - lastTime;
                 if (dt > 0) {
-                    velocity.x = deltaX * 0.8; // Momentum factor
+                    velocity.x = deltaX; // Pure distance per frame roughly
                     lastTime = now;
                 }
 
@@ -691,22 +649,18 @@
                     clearTimeout(longPressTimer);
                 }
 
-                // V105: Boundary Damping (Check bounds for damping)
+                // V104: Horizontal Boundary Damping
                 const vpt = canvas.viewportTransform;
                 const zoom = canvas.getZoom();
-                const winW = window.innerWidth;
                 const contentWidth = screenCount * SCREEN_WIDTH * zoom;
+                const minX = canvas.width - contentWidth - 100; 
                 
-                const leftLimit = (winW / 2) - (SCREEN_WIDTH * zoom / 2);
-                const rightLimit = (winW / 2) - (contentWidth - (SCREEN_WIDTH * zoom / 2));
-
-                // Apply resistance if dragging AWAY from content
-                if (vpt[4] > leftLimit) {
-                    deltaX /= 3; 
-                } else if (vpt[4] < rightLimit) {
-                    deltaX /= 3;
+                // Apply rubber band resistance if out of bounds
+                if (vpt[4] > 100 || vpt[4] < minX) {
+                    deltaX /= 3; // Strong damping
                 }
 
+                // V104: Lock Y Axis (Zero deltaY)
                 canvas.relativePan({ x: deltaX, y: 0 });
                 updateSideBarPosition();
                 
@@ -732,13 +686,33 @@
                 }
             }
 
-            // V105: Trigger Momentum -> then Snap
+            // V104: Snapback Logic
             if (isDraggingCanvas) {
-                if (Math.abs(velocity.x) > 1) {
-                    animateMomentum();
-                } else {
-                    finalizePosition(); // Just check bounds
+                const vpt = canvas.viewportTransform;
+                const zoom = canvas.getZoom();
+                const winW = window.innerWidth;
+                const pageWidth = SCREEN_WIDTH * zoom;
+                
+                // Calculate current "Scroll" position relative to center
+                // vpt[4] is the left edge. Center is vpt[4] + contentWidth/2
+                // We want to find which page center is closest to screen center (winW/2)
+                
+                // Offset of the first page's left edge from screen center
+                const offset = (winW / 2) - vpt[4] - (pageWidth / 2);
+                let targetIndex = Math.round(offset / pageWidth);
+                
+                // Momentum Influence: If flicked, modify target index
+                if (Math.abs(velocity.x) > 15) { // Threshold
+                    if (velocity.x < 0) targetIndex++; // Swipe Left -> Next
+                    else targetIndex--; // Swipe Right -> Prev
                 }
+                
+                // Clamp index
+                if (targetIndex < 0) targetIndex = 0;
+                if (targetIndex >= screenCount) targetIndex = screenCount - 1;
+                
+                // Execute Snap
+                focusOnPage(targetIndex);
             }
 
             isDraggingCanvas = false;
