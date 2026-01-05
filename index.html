@@ -3,14 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Spark Canvas - V2.0</title>
+    <title>Spark Canvas - V2.5</title>
     
-    <link rel="preconnect" href="https://fonts.geekzu.org" crossorigin>
-    <link rel="preconnect" href="https://cdn.staticfile.org" crossorigin>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     
-    <link href="https://cdn.staticfile.org/remixicon/3.5.0/remixicon.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
     
-    <link href="https://fonts.geekzu.org/css2?family=Outfit:wght@400;600;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@100..900&family=Noto+Serif+SC:wght@100..900&family=Outfit:wght@100..900&display=swap" rel="stylesheet">
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
 
     <style>
         :root { 
@@ -31,26 +33,31 @@
             height: 100%; width: 100%; 
             position: fixed; top: 0; left: 0; right: 0; bottom: 0;
             overflow: hidden; 
-            font-family: "Outfit", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; 
+            font-family: "Outfit", "Noto Sans SC", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; 
             background-color: var(--bg-color); 
             color: var(--text-main); margin: 0; 
             touch-action: none; 
             -webkit-user-select: none; user-select: none;
         }
 
-        /* --- V2.0 新增: 启动页样式 --- */
+        /* 启动页样式 */
         #splash-screen {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background-color: var(--bg-color);
-            z-index: 99999; /* 确保在最顶层 */
+            z-index: 99999;
             display: flex; justify-content: center; align-items: center;
-            transition: opacity 0.6s ease-out, visibility 0.6s; /* 淡出动画 */
+            transition: opacity 0.6s ease-out, visibility 0.6s;
         }
         
         #splash-screen.hidden {
             opacity: 0;
             visibility: hidden;
             pointer-events: none;
+        }
+
+        /* 强制隐藏类 (用于刷新时) */
+        #splash-screen.force-hide {
+            display: none !important;
         }
 
         .splash-content {
@@ -64,7 +71,6 @@
             font-weight: 700;
             color: #fff;
             letter-spacing: 1px;
-            /* 简单的文字阴影增加层次感 */
             text-shadow: 0 0 20px rgba(255,255,255,0.1);
         }
 
@@ -73,7 +79,6 @@
             50% { opacity: 1; transform: scale(1.02); }
         }
 
-        /* 状态指示器: 保持隐藏 */
         #status-indicator { display: none !important; }
 
         #canvas-wrapper { 
@@ -304,6 +309,14 @@
         </div>
     </div>
 
+    <script>
+        if (sessionStorage.getItem('spark_session_active')) {
+            document.getElementById('splash-screen').style.display = 'none';
+        } else {
+            sessionStorage.setItem('spark_session_active', 'true');
+        }
+    </script>
+
     <div id="status-indicator">准备就绪</div>
     <div id="canvas-wrapper"><canvas id="c"></canvas></div>
 
@@ -465,27 +478,38 @@
     <input type="file" id="file-input" accept="image/*" multiple onchange="handleFiles(this.files)">
     <input type="file" id="bg-file-input" accept="image/*" onchange="handleBgFile(this.files)">
 
-    <script src="https://cdn.staticfile.org/fabric.js/5.3.1/fabric.min.js"></script>
-
     <script>
-        // V2.0 启动页逻辑
+        // V2.4 启动页控制逻辑 (SessionStorage 版)
         const appStartTime = Date.now();
-        const SPLASH_MIN_DURATION = 800; // 最小展示时间 (ms)
+        const SPLASH_MIN_DURATION = 800; 
+        
+        let splashHidden = false; // 防止重复调用
 
         function hideSplashScreen() {
+            // 如果已经被内联脚本隐藏了，直接返回
+            const splash = document.getElementById('splash-screen');
+            if (splash.style.display === 'none') {
+                splashHidden = true;
+                return;
+            }
+
+            if (splashHidden) return;
+            splashHidden = true;
+
             const now = Date.now();
             const elapsed = now - appStartTime;
             const remaining = Math.max(0, SPLASH_MIN_DURATION - elapsed);
 
             setTimeout(() => {
-                const splash = document.getElementById('splash-screen');
                 splash.classList.add('hidden');
-                // 动画结束后移除，避免遮挡点击
                 setTimeout(() => {
                     splash.style.display = 'none';
-                }, 600); // 配合 CSS transition 时间
+                }, 600); 
             }, remaining);
         }
+        
+        // 兜底机制
+        setTimeout(hideSplashScreen, 3000);
 
         const SCREEN_WIDTH = 540;
         const SCREEN_HEIGHT = 960;
@@ -1135,6 +1159,7 @@
             const list = document.getElementById('font-options-wrapper');
             const arrow = document.getElementById('font-arrow-icon');
             list.classList.toggle('active');
+            // 关闭其他弹窗
             document.getElementById('filter-options-wrapper').classList.remove('active');
             
             if(list.classList.contains('active')) {
@@ -1248,7 +1273,6 @@
             updateWorkspace();
             initViewport();
             if(db) { const tx = db.transaction(STORE_NAME, "readwrite"); tx.objectStore(STORE_NAME).delete("last_session"); }
-            statusIndicator.innerText = "画布已重置"; statusIndicator.classList.add('visible');
             closeModal();
         }
 
@@ -1506,14 +1530,14 @@
                         });
                         drawGrid(); 
                         initViewport(); 
-                        // V1.8: 隐藏恢复状态文本
-                        hideSplashScreen(); // 数据加载完毕，移除启动页
+                        // V2.2 修复: 确保即使有数据加载，也执行隐藏启动页逻辑
+                        hideSplashScreen(); 
                     });
                 } else { 
                     updateWorkspace(); 
                     drawGrid(); 
                     initViewport();
-                    hideSplashScreen(); // 即使是空状态，也要移除启动页
+                    hideSplashScreen(); 
                 }
             };
         }
@@ -1540,10 +1564,7 @@
         function bringGridToFront() { gridLines.forEach(l => l.bringToFront()); }
 
         async function exportContent() {
-            // V1.8: 导出时的状态提示也可以视情况隐藏或使用其他方式，这里暂时保留文字更新逻辑但因为CSS隐藏而不可见
             statusIndicator.innerText = "准备导出..."; 
-            // 如果需要显示导出进度，可以在这里动态移除 !important，或者设计一个新的 Loading UI
-            // 目前保持隐藏以符合"干净界面"的需求
             
             const originalVpt = canvas.viewportTransform.slice();
             const originalWidth = canvas.width;
