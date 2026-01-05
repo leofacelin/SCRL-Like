@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Spark Canvas - V1.9</title>
+    <title>Spark Canvas - V2.0</title>
     
     <link rel="preconnect" href="https://fonts.geekzu.org" crossorigin>
     <link rel="preconnect" href="https://cdn.staticfile.org" crossorigin>
@@ -31,14 +31,48 @@
             height: 100%; width: 100%; 
             position: fixed; top: 0; left: 0; right: 0; bottom: 0;
             overflow: hidden; 
-            /* V1.9 更新: 默认字体改为 Outfit，中文回退到系统字体 */
             font-family: "Outfit", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; 
             background-color: var(--bg-color); 
             color: var(--text-main); margin: 0; 
             touch-action: none; 
             -webkit-user-select: none; user-select: none;
         }
+
+        /* --- V2.0 新增: 启动页样式 --- */
+        #splash-screen {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: var(--bg-color);
+            z-index: 99999; /* 确保在最顶层 */
+            display: flex; justify-content: center; align-items: center;
+            transition: opacity 0.6s ease-out, visibility 0.6s; /* 淡出动画 */
+        }
         
+        #splash-screen.hidden {
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+        }
+
+        .splash-content {
+            text-align: center;
+            animation: breathe 3s infinite ease-in-out;
+        }
+
+        .splash-title {
+            font-family: 'Outfit', sans-serif;
+            font-size: 32px;
+            font-weight: 700;
+            color: #fff;
+            letter-spacing: 1px;
+            /* 简单的文字阴影增加层次感 */
+            text-shadow: 0 0 20px rgba(255,255,255,0.1);
+        }
+
+        @keyframes breathe {
+            0%, 100% { opacity: 0.8; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.02); }
+        }
+
         /* 状态指示器: 保持隐藏 */
         #status-indicator { display: none !important; }
 
@@ -264,6 +298,12 @@
 </head>
 <body>
 
+    <div id="splash-screen">
+        <div class="splash-content">
+            <div class="splash-title">Spark Canvas</div>
+        </div>
+    </div>
+
     <div id="status-indicator">准备就绪</div>
     <div id="canvas-wrapper"><canvas id="c"></canvas></div>
 
@@ -428,6 +468,25 @@
     <script src="https://cdn.staticfile.org/fabric.js/5.3.1/fabric.min.js"></script>
 
     <script>
+        // V2.0 启动页逻辑
+        const appStartTime = Date.now();
+        const SPLASH_MIN_DURATION = 800; // 最小展示时间 (ms)
+
+        function hideSplashScreen() {
+            const now = Date.now();
+            const elapsed = now - appStartTime;
+            const remaining = Math.max(0, SPLASH_MIN_DURATION - elapsed);
+
+            setTimeout(() => {
+                const splash = document.getElementById('splash-screen');
+                splash.classList.add('hidden');
+                // 动画结束后移除，避免遮挡点击
+                setTimeout(() => {
+                    splash.style.display = 'none';
+                }, 600); // 配合 CSS transition 时间
+            }, remaining);
+        }
+
         const SCREEN_WIDTH = 540;
         const SCREEN_HEIGHT = 960;
         let screenCount = 1;
@@ -1406,17 +1465,14 @@
 
         function saveState() {
             if (!db || isInternalUpdate) return;
-            statusIndicator.innerText = "保存中..."; statusIndicator.classList.add('visible', 'status-saving');
+            // V1.8: 隐藏状态文本
             canvas.clipPath = null;
             const json = canvas.toJSON(['isBackground', 'lockMovementX', 'lockMovementY', 'lockRotation', 'lockScalingX', 'lockScalingY', 'hasControls', 'borderColor']);
             updateWorkspace(); 
             const saveData = { id: "autosave", canvas: json, screenCount: screenCount, bgFill: currentBgFill, updated: new Date().getTime() };
             const tx = db.transaction(STORE_NAME, "readwrite");
             tx.objectStore(STORE_NAME).put(saveData, "last_session");
-            tx.oncomplete = () => { 
-                statusIndicator.innerText = "已自动保存"; statusIndicator.classList.remove('status-saving'); statusIndicator.classList.add('status-saved');
-                setTimeout(() => statusIndicator.classList.remove('visible'), 2000);
-            };
+            // V1.8: 移除 oncomplete 中的状态更新
         }
 
         function loadState() {
@@ -1450,17 +1506,22 @@
                         });
                         drawGrid(); 
                         initViewport(); 
-                        statusIndicator.innerText = "已恢复进度"; statusIndicator.classList.add('visible');
-                        setTimeout(() => statusIndicator.classList.remove('visible'), 2000);
+                        // V1.8: 隐藏恢复状态文本
+                        hideSplashScreen(); // 数据加载完毕，移除启动页
                     });
-                } else { updateWorkspace(); drawGrid(); initViewport(); }
+                } else { 
+                    updateWorkspace(); 
+                    drawGrid(); 
+                    initViewport();
+                    hideSplashScreen(); // 即使是空状态，也要移除启动页
+                }
             };
         }
 
         function triggerAutoSave() {
             if(isInternalUpdate) return;
             clearTimeout(saveTimeout);
-            statusIndicator.innerText = "修改中..."; statusIndicator.classList.add('visible'); statusIndicator.classList.remove('status-saved');
+            // V1.8: 隐藏修改中状态文本
             saveTimeout = setTimeout(saveState, 1000);
         }
 
@@ -1479,7 +1540,11 @@
         function bringGridToFront() { gridLines.forEach(l => l.bringToFront()); }
 
         async function exportContent() {
-            statusIndicator.innerText = "准备导出..."; statusIndicator.classList.add('visible', 'status-saving');
+            // V1.8: 导出时的状态提示也可以视情况隐藏或使用其他方式，这里暂时保留文字更新逻辑但因为CSS隐藏而不可见
+            statusIndicator.innerText = "准备导出..."; 
+            // 如果需要显示导出进度，可以在这里动态移除 !important，或者设计一个新的 Loading UI
+            // 目前保持隐藏以符合"干净界面"的需求
+            
             const originalVpt = canvas.viewportTransform.slice();
             const originalWidth = canvas.width;
             const originalHeight = canvas.height;
@@ -1506,7 +1571,7 @@
                         statusIndicator.innerText = "调起分享...";
                         await navigator.share({ files: files, title: 'Spark Canvas', text: '由 Spark Canvas 生成' });
                         shareSuccess = true;
-                        statusIndicator.innerText = "已完成"; statusIndicator.classList.remove('status-saving'); statusIndicator.classList.add('status-saved');
+                        statusIndicator.innerText = "已完成"; 
                     }
                 }
             } catch (err) { console.log("Share skipped/cancelled", err); }
@@ -1519,10 +1584,9 @@
                     document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(a.href);
                     if (i < blobs.length - 1) await new Promise(r => setTimeout(r, 1500));
                 }
-                statusIndicator.innerText = "下载完成"; statusIndicator.classList.remove('status-saving'); statusIndicator.classList.add('status-saved');
+                statusIndicator.innerText = "下载完成"; 
             }
             
-            setTimeout(() => statusIndicator.classList.remove('visible'), 2000);
             canvas.setViewportTransform(originalVpt); canvas.setWidth(originalWidth); canvas.setHeight(originalHeight);
             gridLines.forEach(l => l.visible = true); updateWorkspace(); canvas.requestRenderAll();
         }
