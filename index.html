@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Spark Canvas - V1.8 (性能优化版)</title>
+    <title>Spark Canvas - V1.9</title>
     
     <link rel="preconnect" href="https://fonts.geekzu.org" crossorigin>
     <link rel="preconnect" href="https://cdn.staticfile.org" crossorigin>
     
     <link href="https://cdn.staticfile.org/remixicon/3.5.0/remixicon.css" rel="stylesheet">
     
-    <link href="https://fonts.geekzu.org/css2?family=Noto+Sans+SC:wght@400;500;700&family=Noto+Serif+SC:wght@400;700&family=Outfit:wght@400;600;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.geekzu.org/css2?family=Outfit:wght@400;600;800&display=swap" rel="stylesheet">
 
     <style>
         :root { 
@@ -31,25 +31,16 @@
             height: 100%; width: 100%; 
             position: fixed; top: 0; left: 0; right: 0; bottom: 0;
             overflow: hidden; 
-            font-family: "Noto Sans SC", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
+            /* V1.9 更新: 默认字体改为 Outfit，中文回退到系统字体 */
+            font-family: "Outfit", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; 
             background-color: var(--bg-color); 
             color: var(--text-main); margin: 0; 
             touch-action: none; 
             -webkit-user-select: none; user-select: none;
         }
         
-        /* 初始状态指示器优化 */
-        #status-indicator { 
-            display: flex !important; /* 默认显示，JS加载完逻辑后再控制 */
-            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            background: rgba(0,0,0,0.7); color: white; padding: 10px 20px;
-            border-radius: 20px; font-size: 13px; pointer-events: none;
-            z-index: 9999; backdrop-filter: blur(10px);
-            opacity: 0; transition: opacity 0.3s;
-        }
-        #status-indicator.visible { opacity: 1; }
-
-        /* ...其余样式保持不变... */
+        /* 状态指示器: 保持隐藏 */
+        #status-indicator { display: none !important; }
 
         #canvas-wrapper { 
             width: 100vw; height: 100dvh; 
@@ -273,7 +264,7 @@
 </head>
 <body>
 
-    <div id="status-indicator" class="visible">准备就绪</div>
+    <div id="status-indicator">准备就绪</div>
     <div id="canvas-wrapper"><canvas id="c"></canvas></div>
 
     <div class="side-bar side-glass-capsule">
@@ -437,7 +428,6 @@
     <script src="https://cdn.staticfile.org/fabric.js/5.3.1/fabric.min.js"></script>
 
     <script>
-        // ... (脚本逻辑与 V1.6 完全一致，此处省略重复部分，保持功能) ...
         const SCREEN_WIDTH = 540;
         const SCREEN_HEIGHT = 960;
         let screenCount = 1;
@@ -996,6 +986,7 @@
                     });
                     break;
                 case 'flipX': if(obj.type === 'image') obj.set('flipX', !obj.flipX); break;
+                // V1.5: 移除了 filter-bw case
                 case 'shadow': if (obj.type === 'image') { if (obj.shadow) { obj.set('shadow', null); } else { obj.set('shadow', new fabric.Shadow({ color: 'rgba(0,0,0,0.5)', blur: 20, offsetX: 10, offsetY: 10 })); } } break;
                 case 'spacing-up': if (obj.type === 'i-text' || obj.type === 'text') { let val = obj.charSpacing || 0; obj.set('charSpacing', val + 50); } break;
                 case 'spacing-down': if (obj.type === 'i-text' || obj.type === 'text') { let val = obj.charSpacing || 0; obj.set('charSpacing', val - 50); } break;
