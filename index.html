@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Spark Canvas - V1.7</title>
+    <title>Spark Canvas - V1.8 (性能优化版)</title>
     
-    <script src="https://cdn.staticfile.org/fabric.js/5.3.1/fabric.min.js"></script>
+    <link rel="preconnect" href="https://fonts.geekzu.org" crossorigin>
+    <link rel="preconnect" href="https://cdn.staticfile.org" crossorigin>
     
     <link href="https://cdn.staticfile.org/remixicon/3.5.0/remixicon.css" rel="stylesheet">
     
-    <link rel="preconnect" href="https://fonts.geekzu.org">
-    <link href="https://fonts.geekzu.org/css2?family=Noto+Sans+SC:wght@100..900&family=Noto+Serif+SC:wght@200..900&family=Outfit:wght@100..900&display=swap" rel="stylesheet">
+    <link href="https://fonts.geekzu.org/css2?family=Noto+Sans+SC:wght@400;500;700&family=Noto+Serif+SC:wght@400;700&family=Outfit:wght@400;600;800&display=swap" rel="stylesheet">
 
     <style>
         :root { 
@@ -38,7 +38,18 @@
             -webkit-user-select: none; user-select: none;
         }
         
-        #status-indicator { display: none !important; }
+        /* 初始状态指示器优化 */
+        #status-indicator { 
+            display: flex !important; /* 默认显示，JS加载完逻辑后再控制 */
+            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.7); color: white; padding: 10px 20px;
+            border-radius: 20px; font-size: 13px; pointer-events: none;
+            z-index: 9999; backdrop-filter: blur(10px);
+            opacity: 0; transition: opacity 0.3s;
+        }
+        #status-indicator.visible { opacity: 1; }
+
+        /* ...其余样式保持不变... */
 
         #canvas-wrapper { 
             width: 100vw; height: 100dvh; 
@@ -110,7 +121,6 @@
 
         /* 底部 Dock 样式 */
         .bottom-dock-container {
-            /* V1.7 更新: 底部距离从 30px 改为 15px */
             position: fixed; bottom: 15px; left: 50%; transform: translateX(-50%);
             padding: 8px 12px;
             border-radius: 24px;
@@ -252,7 +262,6 @@
         .info-item { display: flex; align-items: center; gap: 16px; margin-bottom: 16px; }
         .info-icon { font-size: 32px; width: 32px; text-align: center; color: var(--accent-color); flex-shrink: 0; }
         
-        /* V1.7 新增: Info Footer 样式 */
         .modal-footer { margin-top: 25px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.1); }
         .social-links { display: flex; justify-content: center; gap: 24px; margin-bottom: 8px; }
         .social-icon { font-size: 20px; color: #666; cursor: pointer; transition: all 0.2s; text-decoration: none; }
@@ -264,7 +273,7 @@
 </head>
 <body>
 
-    <div id="status-indicator">准备就绪</div>
+    <div id="status-indicator" class="visible">准备就绪</div>
     <div id="canvas-wrapper"><canvas id="c"></canvas></div>
 
     <div class="side-bar side-glass-capsule">
@@ -326,7 +335,6 @@
             <div class="modal-actions">
                 <button class="modal-btn primary" onclick="closeInfoModal()">知道了</button>
             </div>
-            
             <div class="modal-footer">
                 <div class="social-links">
                     <a href="#" class="social-icon" title="小红书"><i class="ri-book-2-fill"></i></a> 
@@ -426,7 +434,10 @@
     <input type="file" id="file-input" accept="image/*" multiple onchange="handleFiles(this.files)">
     <input type="file" id="bg-file-input" accept="image/*" onchange="handleBgFile(this.files)">
 
+    <script src="https://cdn.staticfile.org/fabric.js/5.3.1/fabric.min.js"></script>
+
     <script>
+        // ... (脚本逻辑与 V1.6 完全一致，此处省略重复部分，保持功能) ...
         const SCREEN_WIDTH = 540;
         const SCREEN_HEIGHT = 960;
         let screenCount = 1;
@@ -695,7 +706,6 @@
                     contextMenu.style.display = 'none';
                     document.getElementById('font-options-wrapper').classList.remove('active');
                     document.getElementById('font-arrow-icon').className = "ri-arrow-right-s-line";
-                    // V1.5: 关闭滤镜面板
                     document.getElementById('filter-options-wrapper').classList.remove('active');
                     if(document.getElementById('filter-arrow-icon')) document.getElementById('filter-arrow-icon').className = "ri-arrow-right-s-line";
                 } else {
@@ -986,7 +996,6 @@
                     });
                     break;
                 case 'flipX': if(obj.type === 'image') obj.set('flipX', !obj.flipX); break;
-                // V1.5: 移除了 filter-bw case
                 case 'shadow': if (obj.type === 'image') { if (obj.shadow) { obj.set('shadow', null); } else { obj.set('shadow', new fabric.Shadow({ color: 'rgba(0,0,0,0.5)', blur: 20, offsetX: 10, offsetY: 10 })); } } break;
                 case 'spacing-up': if (obj.type === 'i-text' || obj.type === 'text') { let val = obj.charSpacing || 0; obj.set('charSpacing', val + 50); } break;
                 case 'spacing-down': if (obj.type === 'i-text' || obj.type === 'text') { let val = obj.charSpacing || 0; obj.set('charSpacing', val - 50); } break;
@@ -1014,7 +1023,6 @@
                 contextMenu.style.display = 'none';
                 document.getElementById('font-options-wrapper').classList.remove('active');
                 document.getElementById('font-arrow-icon').className = "ri-arrow-right-s-line";
-                // V1.5: 重置滤镜状态
                 document.getElementById('filter-options-wrapper').classList.remove('active');
                 if(document.getElementById('filter-arrow-icon')) document.getElementById('filter-arrow-icon').className = "ri-arrow-right-s-line";
             }
@@ -1034,8 +1042,6 @@
 
             document.getElementById('font-options-wrapper').classList.remove('active');
             document.getElementById('font-arrow-icon').className = "ri-arrow-right-s-line";
-            
-            // V1.5: 确保滤镜面板初始关闭
             document.getElementById('filter-options-wrapper').classList.remove('active');
             if(document.getElementById('filter-arrow-icon')) document.getElementById('filter-arrow-icon').className = "ri-arrow-right-s-line";
 
@@ -1079,7 +1085,6 @@
             const list = document.getElementById('font-options-wrapper');
             const arrow = document.getElementById('font-arrow-icon');
             list.classList.toggle('active');
-            // 关闭其他弹窗
             document.getElementById('filter-options-wrapper').classList.remove('active');
             
             if(list.classList.contains('active')) {
@@ -1089,12 +1094,10 @@
             }
         }
 
-        // V1.5: 滤镜面板切换逻辑
         function toggleFilterList() {
             const list = document.getElementById('filter-options-wrapper');
             const arrow = document.getElementById('filter-arrow-icon');
             list.classList.toggle('active');
-            // 关闭其他弹窗
             document.getElementById('font-options-wrapper').classList.remove('active');
 
             if(list.classList.contains('active')) {
@@ -1104,13 +1107,10 @@
             }
         }
         
-        // V1.5: 统一的滤镜应用函数
         function applyFilter(type) {
             const activeObj = canvas.getActiveObject();
             if (!activeObj || activeObj.type !== 'image') return;
 
-            // 为了简单起见，应用新滤镜前先清除所有现有滤镜。
-            // 如果需要叠加滤镜，则需要更复杂的逻辑来管理滤镜数组。
             activeObj.filters = []; 
 
             switch (type) {
@@ -1145,21 +1145,19 @@
                     }));
                     break;
                 case 'none':
-                    // 已在开头清空滤镜，此处无需操作
                     break;
             }
 
             activeObj.applyFilters();
             canvas.requestRenderAll();
             triggerAutoSave();
-            toggleFilterList(); // 选择后自动关闭面板
+            toggleFilterList(); 
         }
 
-        // ... [V1.6 新增: 预压缩函数] ...
         function resizeImage(dataUrl, callback) {
             const img = new Image();
             img.onload = () => {
-                const maxDim = 2048; // WebGL 安全尺寸
+                const maxDim = 2048; 
                 let width = img.width;
                 let height = img.height;
 
@@ -1177,7 +1175,6 @@
                     tempCanvas.height = height;
                     const ctx = tempCanvas.getContext('2d');
                     ctx.drawImage(img, 0, 0, width, height);
-                    // 使用高质量 JPEG 压缩
                     callback(tempCanvas.toDataURL('image/jpeg', 0.9)); 
                 } else {
                     callback(dataUrl);
@@ -1227,9 +1224,7 @@
 
         function addText() {
             const center = canvas.getVpCenter();
-            // V1.2 更新: 默认使用 Outfit 字体
             const selectedFont = "'Outfit', sans-serif";
-            // V1.3 更新: 默认文字为 SparkCanvas
             const text = new fabric.IText('SparkCanvas', {
                 left: center.x, top: center.y,
                 fontFamily: selectedFont, 
@@ -1305,7 +1300,6 @@
             });
         }
 
-        // V1.6 更新: 使用 resizeImage 预处理图片
         function processImageFile(file, isBackground = false) {
             const reader = new FileReader();
             reader.onload = (f) => {
