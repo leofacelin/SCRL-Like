@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Spark Canvas - V1.5</title>
+    <title>Spark Canvas - V1.6</title>
     
     <script src="https://cdn.staticfile.org/fabric.js/5.3.1/fabric.min.js"></script>
     
@@ -200,7 +200,6 @@
         .font-toggle-btn, .filter-toggle-btn { display: flex; justify-content: space-between; align-items: center; width: 100%; padding: 10px 10px; background: rgba(255,255,255,0.05); border-radius: 10px; cursor: pointer; color: #ddd; font-size: 13px; font-weight: 500; transition: background 0.2s; }
         .font-toggle-btn:hover, .filter-toggle-btn:hover { background: rgba(255,255,255,0.15); color: white; }
 
-        /* 复用 Font List 样式给 Filter */
         .popup-options-list {
              display: none; flex-direction: column; gap: 4px;
              position: absolute; 
@@ -1138,6 +1137,37 @@
             toggleFilterList(); // 选择后自动关闭面板
         }
 
+        // ... [V1.6 新增: 预压缩函数] ...
+        function resizeImage(dataUrl, callback) {
+            const img = new Image();
+            img.onload = () => {
+                const maxDim = 2048; // WebGL 安全尺寸
+                let width = img.width;
+                let height = img.height;
+
+                if (width > maxDim || height > maxDim) {
+                    if (width > height) {
+                        height *= maxDim / width;
+                        width = maxDim;
+                    } else {
+                        width *= maxDim / height;
+                        height = maxDim;
+                    }
+                    
+                    const tempCanvas = document.createElement('canvas');
+                    tempCanvas.width = width;
+                    tempCanvas.height = height;
+                    const ctx = tempCanvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+                    // 使用高质量 JPEG 压缩
+                    callback(tempCanvas.toDataURL('image/jpeg', 0.9)); 
+                } else {
+                    callback(dataUrl);
+                }
+            };
+            img.src = dataUrl;
+        }
+
         function showModal() { confirmModal.style.display = 'block'; }
         function closeModal() { confirmModal.style.display = 'none'; }
         
@@ -1257,26 +1287,29 @@
             });
         }
 
+        // V1.6 更新: 使用 resizeImage 预处理图片
         function processImageFile(file, isBackground = false) {
             const reader = new FileReader();
             reader.onload = (f) => {
-                if (isBackground) {
-                    applyPattern(f.target.result);
-                } else {
-                    const center = canvas.getVpCenter();
-                    fabric.Image.fromURL(f.target.result, (img) => {
-                        if (img.width > SCREEN_WIDTH) img.scaleToWidth(SCREEN_WIDTH * 0.8);
-                        const offsetX = (Math.random() * 40 - 20);
-                        const offsetY = (Math.random() * 40 - 20);
-                        img.set({ left: center.x - (img.getScaledWidth()/2) + offsetX, top: center.y - (img.getScaledHeight()/2) + offsetY });
-                        img.setControlsVisibility({ mt: false, mb: false, ml: false, mr: false });
-                        canvas.add(img); 
-                        canvas.setActiveObject(img); 
-                        bringGridToFront(); 
-                        triggerAutoSave();
-                        canvas.requestRenderAll(); 
-                    });
-                }
+                resizeImage(f.target.result, (resizedDataUrl) => {
+                    if (isBackground) {
+                        applyPattern(resizedDataUrl);
+                    } else {
+                        const center = canvas.getVpCenter();
+                        fabric.Image.fromURL(resizedDataUrl, (img) => {
+                            if (img.width > SCREEN_WIDTH) img.scaleToWidth(SCREEN_WIDTH * 0.8);
+                            const offsetX = (Math.random() * 40 - 20);
+                            const offsetY = (Math.random() * 40 - 20);
+                            img.set({ left: center.x - (img.getScaledWidth()/2) + offsetX, top: center.y - (img.getScaledHeight()/2) + offsetY });
+                            img.setControlsVisibility({ mt: false, mb: false, ml: false, mr: false });
+                            canvas.add(img); 
+                            canvas.setActiveObject(img); 
+                            bringGridToFront(); 
+                            triggerAutoSave();
+                            canvas.requestRenderAll(); 
+                        });
+                    }
+                });
             };
             reader.readAsDataURL(file);
         }
