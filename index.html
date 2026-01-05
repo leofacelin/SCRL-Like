@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Spark Canvas - V1.6</title>
+    <title>Spark Canvas - V1.7</title>
     
     <script src="https://cdn.staticfile.org/fabric.js/5.3.1/fabric.min.js"></script>
     
@@ -110,7 +110,8 @@
 
         /* 底部 Dock 样式 */
         .bottom-dock-container {
-            position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
+            /* V1.7 更新: 底部距离从 30px 改为 15px */
+            position: fixed; bottom: 15px; left: 50%; transform: translateX(-50%);
             padding: 8px 12px;
             border-radius: 24px;
             display: flex; align-items: center; gap: 12px;
@@ -251,6 +252,13 @@
         .info-item { display: flex; align-items: center; gap: 16px; margin-bottom: 16px; }
         .info-icon { font-size: 32px; width: 32px; text-align: center; color: var(--accent-color); flex-shrink: 0; }
         
+        /* V1.7 新增: Info Footer 样式 */
+        .modal-footer { margin-top: 25px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.1); }
+        .social-links { display: flex; justify-content: center; gap: 24px; margin-bottom: 8px; }
+        .social-icon { font-size: 20px; color: #666; cursor: pointer; transition: all 0.2s; text-decoration: none; }
+        .social-icon:hover { color: var(--text-main); transform: scale(1.1); }
+        .made-with { font-size: 11px; color: #555; }
+
         #file-input, #bg-file-input { display: none; }
     </style>
 </head>
@@ -310,13 +318,23 @@
 
     <div id="info-modal">
         <div class="modal-box">
-            <div class="modal-title">HOW TO</div>
+            <div class="modal-title">Spark Canvas</div>
             <div class="info-list">
                 <div class="info-item"><i class="info-icon ri-computer-line"></i> <span>图片/文字上 <b>右键</b> 唤起菜单</span></div>
                 <div class="info-item"><i class="info-icon ri-smartphone-line"></i> <span>图片/文字上 <b>长按</b> 唤起菜单</span></div>
             </div>
             <div class="modal-actions">
                 <button class="modal-btn primary" onclick="closeInfoModal()">知道了</button>
+            </div>
+            
+            <div class="modal-footer">
+                <div class="social-links">
+                    <a href="#" class="social-icon" title="小红书"><i class="ri-book-2-fill"></i></a> 
+                    <a href="#" class="social-icon" title="Weibo"><i class="ri-weibo-fill"></i></a>
+                    <a href="#" class="social-icon" title="X"><i class="ri-twitter-x-fill"></i></a>
+                    <a href="#" class="social-icon" title="Instagram"><i class="ri-instagram-fill"></i></a>
+                </div>
+                <div class="made-with">Made with ♥️</div>
             </div>
         </div>
     </div>
