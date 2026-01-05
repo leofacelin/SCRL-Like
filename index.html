@@ -3,19 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Spark Canvas - V131 (UI细节修复版)</title>
+    <title>Spark Canvas - V1.5</title>
     
     <script src="https://cdn.staticfile.org/fabric.js/5.3.1/fabric.min.js"></script>
     
     <link href="https://cdn.staticfile.org/remixicon/3.5.0/remixicon.css" rel="stylesheet">
     
     <link rel="preconnect" href="https://fonts.geekzu.org">
-    <link href="https://fonts.geekzu.org/css2?family=Noto+Sans+SC:wght@100..900&family=Noto+Serif+SC:wght@200..900&display=swap" rel="stylesheet">
+    <link href="https://fonts.geekzu.org/css2?family=Noto+Sans+SC:wght@100..900&family=Noto+Serif+SC:wght@200..900&family=Outfit:wght@100..900&display=swap" rel="stylesheet">
 
     <style>
         :root { 
             --bg-color: #121212; 
-            /* Advanced Glass Variables (Based on V123) */
+            /* 玻璃拟态变量 */
             --glass-bg: rgba(30, 30, 30, 0.65); 
             --glass-border: rgba(255, 255, 255, 0.1);
             --glass-highlight: rgba(255, 255, 255, 0.05);
@@ -52,7 +52,7 @@
         .canvas-container { margin: 0 auto; background: transparent !important; }
         canvas { background: transparent !important; }
 
-        /* --- Glassmorphism Base --- */
+        /* --- 玻璃拟态基础类 --- */
         .glass-panel {
             background: var(--glass-bg);
             backdrop-filter: blur(24px) saturate(180%);
@@ -62,7 +62,7 @@
             box-sizing: border-box;
         }
 
-        /* Side Bar Styling (V130 Refined Size) */
+        /* 侧边栏样式 */
         .side-glass-capsule {
             background: var(--glass-bg);
             backdrop-filter: blur(24px) saturate(180%);
@@ -70,7 +70,6 @@
             border: 1px solid var(--glass-border);
             box-shadow: var(--glass-shadow);
             box-sizing: border-box;
-            /* V130: Smaller radius, padding, and gap */
             border-radius: 18px; 
             padding: 5px; 
             display: flex; 
@@ -79,7 +78,6 @@
             z-index: 90;
         }
 
-        /* V129 FIX: No transition for instant sync */
         .side-bar {
             position: fixed; top: 50%; transform: translateY(-50%);
         }
@@ -88,12 +86,11 @@
             position: fixed; 
         }
 
-        /* V130: Smaller Side Buttons */
         .side-btn {
-            width: 36px; height: 36px; /* Reduced size */
-            border-radius: 12px;       /* Reduced radius */
+            width: 36px; height: 36px;
+            border-radius: 12px;
             display: flex; align-items: center; justify-content: center;
-            font-size: 18px;           /* Reduced icon size */
+            font-size: 18px;
             color: var(--text-sub);
             cursor: pointer; 
             transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
@@ -111,8 +108,7 @@
         .side-btn.danger { color: #666; }
         .side-btn.danger:hover { background: rgba(255, 69, 58, 0.15); color: var(--danger-color); border-color: var(--danger-color); }
 
-
-        /* V127: Flattened Dock Container */
+        /* 底部 Dock 样式 */
         .bottom-dock-container {
             position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
             padding: 8px 12px;
@@ -136,8 +132,7 @@
         .dock-btn:hover { background: var(--glass-highlight); transform: translateY(-4px); }
         .dock-btn:active { transform: scale(0.92) translateY(-2px); }
 
-
-        /* Panels (BG & Fonts) */
+        /* 背景设置面板 */
         #bg-panel { 
             display: none; position: absolute; bottom: 100px; left: 50%; transform: translateX(-50%); 
             border-radius: 20px; padding: 20px; 
@@ -145,7 +140,8 @@
         }
         @keyframes panelUp { from { opacity: 0; transform: translate(-50%, 20px) scale(0.95); } to { opacity: 1; transform: translate(-50%, 0) scale(1); } }
         
-        .panel-title { font-size: 11px; color: #666; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 1px; text-align: center; font-weight: 700; }
+        .panel-title { font-size: 11px; color: #e0e0e0; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 1px; text-align: center; font-weight: 700; }
+        
         .bg-options { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
         .bg-option { width: 52px; height: 52px; border-radius: 14px; border: 2px solid #444; cursor: pointer; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; background-size: cover; background-position: center; transition: all 0.2s; }
         .bg-option:hover { border-color: #fff; transform: scale(1.05); }
@@ -156,8 +152,7 @@
         .preset-dot { width: 100%; height: 100%; border-radius: 4px; cursor: pointer; border: 1px solid rgba(255,255,255,0.1); transition: transform 0.2s; }
         .preset-dot:hover { transform: scale(1.2); border-color: white; z-index: 2; }
 
-
-        /* Context Menu (Standard V123) */
+        /* 上下文菜单 */
         #context-menu { 
             display: none; position: absolute; z-index: 2000; width: 170px; 
             border-radius: 16px; padding: 6px; 
@@ -165,7 +160,8 @@
         }
         @keyframes menuFadeIn { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
         
-        .menu-header { font-size: 10px; color: #666; padding: 4px 8px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 2px; font-weight: 700; display: none; }
+        .menu-header { font-size: 10px; color: #e0e0e0; padding: 4px 8px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 2px; font-weight: 700; display: none; }
+        
         .layer-controls { display: flex; justify-content: space-between; background: rgba(255,255,255,0.05); border-radius: 10px; padding: 4px; margin-bottom: 6px; }
         .layer-btn { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: 8px; cursor: pointer; font-size: 18px; color: #ccc; transition: background 0.2s; }
         .layer-btn:hover { background: rgba(255,255,255,0.15); color: white; }
@@ -178,7 +174,6 @@
 
         .text-colors-container { display: flex; gap: 6px; padding: 8px 4px; justify-content: space-around; border-bottom: 1px solid rgba(255,255,255,0.08); margin-bottom: 6px; }
         
-        /* V131 FIX: Added flex-shrink and box-sizing to prevent squishing */
         .text-color-dot { 
             width: 18px; height: 18px; 
             border-radius: 50%; 
@@ -202,25 +197,28 @@
         .control-btn:active { transform: scale(0.9); }
 
         .font-selector-row { display: none; padding: 2px; margin-bottom: 6px; }
-        .font-toggle-btn { display: flex; justify-content: space-between; align-items: center; width: 100%; padding: 10px 10px; background: rgba(255,255,255,0.05); border-radius: 10px; cursor: pointer; color: #ddd; font-size: 13px; font-weight: 500; transition: background 0.2s; }
-        .font-toggle-btn:hover { background: rgba(255,255,255,0.15); color: white; }
+        .font-toggle-btn, .filter-toggle-btn { display: flex; justify-content: space-between; align-items: center; width: 100%; padding: 10px 10px; background: rgba(255,255,255,0.05); border-radius: 10px; cursor: pointer; color: #ddd; font-size: 13px; font-weight: 500; transition: background 0.2s; }
+        .font-toggle-btn:hover, .filter-toggle-btn:hover { background: rgba(255,255,255,0.15); color: white; }
 
-        .font-options-list {
+        /* 复用 Font List 样式给 Filter */
+        .popup-options-list {
              display: none; flex-direction: column; gap: 4px;
-             position: absolute; left: 105%; top: 100px;
+             position: absolute; 
+             left: calc(105% - 100px); 
+             top: 100px;
              border-radius: 14px; padding: 6px; min-width: 110px;
              z-index: 2001;
         }
-        .font-options-list.active { display: flex; }
-        .font-option { padding: 10px 14px; font-size: 14px; color: #ccc; cursor: pointer; border-radius: 8px; text-align: left; white-space: nowrap; transition: background 0.2s; }
-        .font-option:hover { background: var(--accent-color); color: white; }
+        .popup-options-list.active { display: flex; }
+        .popup-option { padding: 10px 14px; font-size: 14px; color: #ccc; cursor: pointer; border-radius: 8px; text-align: left; white-space: nowrap; transition: background 0.2s; }
+        .popup-option:hover { background: var(--accent-color); color: white; }
 
         .show-always { display: flex !important; }
         .show-header { display: block !important; }
 
-        /* Modals */
+        /* 模态框 */
         #confirm-modal, #info-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); backdrop-filter: blur(8px); z-index: 3000; animation: fadeIn 0.3s; }
-        /* V121 Info Modal Size (240px) */
+
         .modal-box { 
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
             background: #222; border: 1px solid #444; 
@@ -235,6 +233,7 @@
         .modal-title { font-size: 18px; font-weight: 700; margin-bottom: 12px; color: white; letter-spacing: 0.5px; }
         .modal-desc { font-size: 14px; color: #999; margin-bottom: 24px; line-height: 1.5; }
         .modal-actions { display: flex; gap: 12px; justify-content: center; }
+        
         .modal-btn { 
             flex: 1; padding: 12px; border-radius: 10px; 
             cursor: pointer; border: none; font-size: 14px; font-weight: 600; 
@@ -248,7 +247,7 @@
         .modal-btn.primary { background: var(--accent-color); color: white; }
         .modal-btn.primary:hover { background: #0062cc; }
 
-        /* Info List */
+        /* 信息列表 */
         .info-list { text-align: left; font-size: 14px; color: #bbb; margin-bottom: 25px; padding: 0 5px; }
         .info-item { display: flex; align-items: center; gap: 16px; margin-bottom: 16px; }
         .info-icon { font-size: 32px; width: 32px; text-align: center; color: var(--accent-color); flex-shrink: 0; }
@@ -257,6 +256,7 @@
     </style>
 </head>
 <body>
+
     <div id="status-indicator">准备就绪</div>
     <div id="canvas-wrapper"><canvas id="c"></canvas></div>
 
@@ -337,8 +337,19 @@
 
         <div class="menu-header image-menu-item">效果 Effect</div>
         <div class="menu-item image-menu-item" onclick="menuAction('flipX')"><i class="menu-icon-span ri-arrow-left-right-line"></i> 水平翻转</div>
-        <div class="menu-item image-menu-item" onclick="menuAction('filter-bw')"><i class="menu-icon-span ri-contrast-drop-line"></i> 黑白滤镜</div>
         <div class="menu-item image-menu-item" onclick="menuAction('shadow')"><i class="menu-icon-span ri-drop-line"></i> 投影</div>
+
+        <div class="menu-item image-menu-item" onclick="toggleFilterList()">
+            <i class="menu-icon-span ri-contrast-drop-line"></i> 滤镜 Filter <i class="ri-arrow-right-s-line" id="filter-arrow-icon" style="margin-left:auto"></i>
+        </div>
+
+        <div id="filter-options-wrapper" class="popup-options-list glass-panel">
+            <div class="popup-option" onclick="applyFilter('bw')">黑白 B&W</div>
+            <div class="popup-option" onclick="applyFilter('cyber')">赛博 Cyber</div>
+            <div class="popup-option" onclick="applyFilter('sunset')">落日 Sunset</div>
+            <div class="popup-option" onclick="applyFilter('violet')">紫罗兰 Violet</div>
+            <div class="popup-option" onclick="applyFilter('none')">无 None</div>
+        </div>
 
         <div class="menu-header text-menu-item">文字设置</div>
         
@@ -348,9 +359,10 @@
             </div>
         </div>
         
-        <div id="font-options-wrapper" class="font-options-list glass-panel">
-            <div class="font-option" style="font-family: 'Noto Sans SC', sans-serif" onclick="changeFont('\'Noto Sans SC\', sans-serif')">思源黑体</div>
-            <div class="font-option" style="font-family: 'Noto Serif SC', serif" onclick="changeFont('\'Noto Serif SC\', serif')">思源宋体</div>
+        <div id="font-options-wrapper" class="popup-options-list glass-panel">
+            <div class="popup-option" style="font-family: 'Noto Sans SC', sans-serif" onclick="changeFont('\'Noto Sans SC\', sans-serif')">思源黑体</div>
+            <div class="popup-option" style="font-family: 'Noto Serif SC', serif" onclick="changeFont('\'Noto Serif SC\', serif')">思源宋体</div>
+            <div class="popup-option" style="font-family: 'Outfit', sans-serif" onclick="changeFont('\'Outfit\', sans-serif')">Outfit</div>
         </div>
 
         <div class="text-colors-container text-menu-item">
@@ -403,7 +415,7 @@
         let screenCount = 1;
         fabric.textureSize = 2048; 
 
-        // V105 Optimization: Layout Caching
+        // 布局缓存
         let layoutState = { visualHeight: 0, availableHeight: 0 };
 
         const rotateIconImg = new Image();
@@ -454,7 +466,6 @@
         const statusIndicator = document.getElementById('status-indicator');
         const confirmModal = document.getElementById('confirm-modal');
         const infoModal = document.getElementById('info-modal');
-        // addPopover is removed from JS logic as it's removed from HTML structure
         const sideBar = document.querySelector('.side-bar');
         const sideBarBottom = document.querySelector('.side-bar-bottom');
 
@@ -511,7 +522,7 @@
             
             if(sideBarBottom) {
                 sideBarBottom.style.left = newLeft;
-                // V130: Adjusted offset for smaller buttons (new height ~88px) + 5px upward shift = 93px
+                // 修正偏移: 适配更小的按钮
                 sideBarBottom.style.top = (contentBottomEdge - 93) + 'px'; 
             }
         }
@@ -649,8 +660,6 @@
             cancelAnimationFrame(momentumID);
             velocityX = 0; velocityY = 0;
             lastMoveTime = Date.now();
-
-            // V128: Removed AddPopover logic
             
             if (opt.button === 3) {
                 if (target && target !== bgRect) {
@@ -669,6 +678,9 @@
                     contextMenu.style.display = 'none';
                     document.getElementById('font-options-wrapper').classList.remove('active');
                     document.getElementById('font-arrow-icon').className = "ri-arrow-right-s-line";
+                    // V1.5: 关闭滤镜面板
+                    document.getElementById('filter-options-wrapper').classList.remove('active');
+                    if(document.getElementById('filter-arrow-icon')) document.getElementById('filter-arrow-icon').className = "ri-arrow-right-s-line";
                 } else {
                     const currentType = getBroadType(target.type);
                     const menuType = contextMenu.dataset.currentType; 
@@ -676,6 +688,7 @@
                     if (currentType !== menuType) {
                         contextMenu.style.display = 'none';
                         document.getElementById('font-options-wrapper').classList.remove('active');
+                        document.getElementById('filter-options-wrapper').classList.remove('active');
                     } else {
                         updateContextMenuState(target);
                     }
@@ -715,6 +728,7 @@
             } else if (!target || target === bgRect) {
                 contextMenu.style.display = 'none';
                 document.getElementById('font-options-wrapper').classList.remove('active');
+                document.getElementById('filter-options-wrapper').classList.remove('active');
             }
         });
 
@@ -743,7 +757,6 @@
                     clearTimeout(longPressTimer);
                 }
 
-                // V105 Optimization: Use cached layout state
                 if (layoutState.visualHeight <= layoutState.availableHeight) {
                     deltaY = 0; 
                     velocityY = 0; 
@@ -831,7 +844,6 @@
                 let panX = velocityX * 16; 
                 let panY = velocityY * 16;
 
-                // V105: Use Cached Layout
                 if (layoutState.visualHeight <= layoutState.availableHeight) {
                     panY = 0;
                 }
@@ -914,7 +926,6 @@
         });
 
         let longPressTimer;
-        // V118 Update: Full font weights
         const FONT_WEIGHTS = [100, 200, 300, 400, 500, 600, 700, 800, 900];
 
         function menuAction(action) {
@@ -958,7 +969,7 @@
                     });
                     break;
                 case 'flipX': if(obj.type === 'image') obj.set('flipX', !obj.flipX); break;
-                case 'filter-bw': if (obj.type === 'image') { if (obj.filters && obj.filters.length > 0) { obj.filters = []; } else { obj.filters.push(new fabric.Image.filters.Grayscale()); } obj.applyFilters(); } break;
+                // V1.5: 移除了 filter-bw case
                 case 'shadow': if (obj.type === 'image') { if (obj.shadow) { obj.set('shadow', null); } else { obj.set('shadow', new fabric.Shadow({ color: 'rgba(0,0,0,0.5)', blur: 20, offsetX: 10, offsetY: 10 })); } } break;
                 case 'spacing-up': if (obj.type === 'i-text' || obj.type === 'text') { let val = obj.charSpacing || 0; obj.set('charSpacing', val + 50); } break;
                 case 'spacing-down': if (obj.type === 'i-text' || obj.type === 'text') { let val = obj.charSpacing || 0; obj.set('charSpacing', val - 50); } break;
@@ -967,7 +978,6 @@
                 case 'align-left': if (obj.type === 'i-text' || obj.type === 'text') obj.set('textAlign', 'left'); break;
                 case 'align-center': if (obj.type === 'i-text' || obj.type === 'text') obj.set('textAlign', 'center'); break;
                 case 'align-right': if (obj.type === 'i-text' || obj.type === 'text') obj.set('textAlign', 'right'); break;
-                // V121: Swapped logic for weight buttons
                 case 'weight-up': if (obj.type === 'i-text' || obj.type === 'text') { let current = parseInt(obj.fontWeight) || 600; if(current === 'normal') current = 400; if(current === 'bold') current = 700; let next = FONT_WEIGHTS.find(w => w > current); if (!next) next = FONT_WEIGHTS[FONT_WEIGHTS.length - 1]; obj.set('fontWeight', next); } break;
                 case 'weight-down': if (obj.type === 'i-text' || obj.type === 'text') { let current = parseInt(obj.fontWeight) || 600; if(current === 'normal') current = 400; if(current === 'bold') current = 700; let prev = [...FONT_WEIGHTS].reverse().find(w => w < current); if (!prev) prev = FONT_WEIGHTS[0]; obj.set('fontWeight', prev); } break;
             }
@@ -987,6 +997,9 @@
                 contextMenu.style.display = 'none';
                 document.getElementById('font-options-wrapper').classList.remove('active');
                 document.getElementById('font-arrow-icon').className = "ri-arrow-right-s-line";
+                // V1.5: 重置滤镜状态
+                document.getElementById('filter-options-wrapper').classList.remove('active');
+                if(document.getElementById('filter-arrow-icon')) document.getElementById('filter-arrow-icon').className = "ri-arrow-right-s-line";
             }
         }
 
@@ -1002,9 +1015,12 @@
             contextMenu.dataset.currentType = getBroadType(type);
             updateContextMenuState(target);
 
-            // Reset font menu state
             document.getElementById('font-options-wrapper').classList.remove('active');
             document.getElementById('font-arrow-icon').className = "ri-arrow-right-s-line";
+            
+            // V1.5: 确保滤镜面板初始关闭
+            document.getElementById('filter-options-wrapper').classList.remove('active');
+            if(document.getElementById('filter-arrow-icon')) document.getElementById('filter-arrow-icon').className = "ri-arrow-right-s-line";
 
             if (type === 'image') {
                 imageItems.forEach(el => el.style.display = 'flex');
@@ -1042,19 +1058,84 @@
             bgPanel.style.display = 'none';
         }
 
-        function toggleAddMenu(forceState) {
-            // V127: Removed logic as popover is gone
-        }
-
         function toggleFontList() {
             const list = document.getElementById('font-options-wrapper');
             const arrow = document.getElementById('font-arrow-icon');
             list.classList.toggle('active');
+            // 关闭其他弹窗
+            document.getElementById('filter-options-wrapper').classList.remove('active');
+            
             if(list.classList.contains('active')) {
                 arrow.className = "ri-arrow-left-s-line";
             } else {
                 arrow.className = "ri-arrow-right-s-line";
             }
+        }
+
+        // V1.5: 滤镜面板切换逻辑
+        function toggleFilterList() {
+            const list = document.getElementById('filter-options-wrapper');
+            const arrow = document.getElementById('filter-arrow-icon');
+            list.classList.toggle('active');
+            // 关闭其他弹窗
+            document.getElementById('font-options-wrapper').classList.remove('active');
+
+            if(list.classList.contains('active')) {
+                arrow.className = "ri-arrow-left-s-line";
+            } else {
+                arrow.className = "ri-arrow-right-s-line";
+            }
+        }
+        
+        // V1.5: 统一的滤镜应用函数
+        function applyFilter(type) {
+            const activeObj = canvas.getActiveObject();
+            if (!activeObj || activeObj.type !== 'image') return;
+
+            // 为了简单起见，应用新滤镜前先清除所有现有滤镜。
+            // 如果需要叠加滤镜，则需要更复杂的逻辑来管理滤镜数组。
+            activeObj.filters = []; 
+
+            switch (type) {
+                case 'bw':
+                    activeObj.filters.push(new fabric.Image.filters.Grayscale());
+                    break;
+                case 'cyber':
+                    activeObj.filters.push(new fabric.Image.filters.Composed({
+                        subFilters: [
+                            new fabric.Image.filters.Grayscale({ mode: 'luminosity' }),
+                            new fabric.Image.filters.BlendColor({ color: '#76ff03', mode: 'multiply' }),
+                            new fabric.Image.filters.BlendColor({ color: '#2962ff', mode: 'lighten' })
+                        ]
+                    }));
+                    break;
+                case 'sunset':
+                    activeObj.filters.push(new fabric.Image.filters.Composed({
+                        subFilters: [
+                            new fabric.Image.filters.Grayscale({ mode: 'luminosity' }),
+                            new fabric.Image.filters.BlendColor({ color: '#ffd600', mode: 'multiply' }),
+                            new fabric.Image.filters.BlendColor({ color: '#d50000', mode: 'lighten' })
+                        ]
+                    }));
+                    break;
+                case 'violet':
+                    activeObj.filters.push(new fabric.Image.filters.Composed({
+                        subFilters: [
+                            new fabric.Image.filters.Grayscale({ mode: 'luminosity' }),
+                            new fabric.Image.filters.BlendColor({ color: '#e040fb', mode: 'multiply' }),
+                            new fabric.Image.filters.BlendColor({ color: '#4a148c', mode: 'lighten' })
+                        ]
+                    }));
+                    break;
+                case 'none':
+                    // 已在开头清空滤镜，此处无需操作
+                    break;
+            }
+
+            activeObj.applyFilters();
+            canvas.requestRenderAll();
+            triggerAutoSave();
+            toggleFilterList(); // 选择后自动关闭面板
         }
 
         function showModal() { confirmModal.style.display = 'block'; }
@@ -1098,8 +1179,10 @@
 
         function addText() {
             const center = canvas.getVpCenter();
-            const selectedFont = "'Noto Sans SC', sans-serif";
-            const text = new fabric.IText('双击编辑', {
+            // V1.2 更新: 默认使用 Outfit 字体
+            const selectedFont = "'Outfit', sans-serif";
+            // V1.3 更新: 默认文字为 SparkCanvas
+            const text = new fabric.IText('SparkCanvas', {
                 left: center.x, top: center.y,
                 fontFamily: selectedFont, 
                 fontWeight: 600, 
@@ -1284,6 +1367,7 @@
                 request.onsuccess = (e) => { db = e.target.result; loadState(); };
             } catch(e) { console.log("DB Error", e); }
         }
+
         function saveState() {
             if (!db || isInternalUpdate) return;
             statusIndicator.innerText = "保存中..."; statusIndicator.classList.add('visible', 'status-saving');
@@ -1298,6 +1382,7 @@
                 setTimeout(() => statusIndicator.classList.remove('visible'), 2000);
             };
         }
+
         function loadState() {
             const tx = db.transaction(STORE_NAME, "readonly");
             tx.objectStore(STORE_NAME).get("last_session").onsuccess = (e) => {
@@ -1335,12 +1420,14 @@
                 } else { updateWorkspace(); drawGrid(); initViewport(); }
             };
         }
+
         function triggerAutoSave() {
             if(isInternalUpdate) return;
             clearTimeout(saveTimeout);
             statusIndicator.innerText = "修改中..."; statusIndicator.classList.add('visible'); statusIndicator.classList.remove('status-saved');
             saveTimeout = setTimeout(saveState, 1000);
         }
+
         canvas.on('object:modified', triggerAutoSave); canvas.on('object:added', triggerAutoSave); canvas.on('object:removed', triggerAutoSave);
         
         function drawGrid() {
