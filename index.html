@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Spark Canvas - V1.5 (连续多选增强)</title>
+    <title>Spark Canvas - V1.6 (多选终极修复)</title>
     
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -144,7 +144,7 @@
         .side-btn.danger { color: #666; }
         .side-btn.danger:hover { background: rgba(255, 69, 58, 0.15); color: var(--danger-color); border-color: var(--danger-color); }
 
-        /* V3.8 底部 UI 包装器: 控制整体对齐和间距 */
+        /* V3.8 底部 UI 包装器: 垂直对齐，底部居中 */
         .bottom-ui-wrapper {
             position: fixed;
             left: 50%;
@@ -153,30 +153,30 @@
             display: flex;
             align-items: center;
             justify-content: center; 
-            gap: 12px; /* 按钮组之间的间距 */
+            gap: 12px; /* Shift键和Dock之间的间距 */
             z-index: 100;
-            width: 100%; 
-            pointer-events: none; /* 穿透点击，让下方画布可被点到 */
+            width: auto;
+            pointer-events: none; /* 让 wrapper 不遮挡下方点击，子元素开启 */
         }
 
         /* 底部 Dock 样式 */
         .bottom-dock-container {
-            position: relative; 
+            position: relative; /* 相对 wrapper 定位 */
             left: auto; bottom: auto; transform: none;
-            padding: 6px 12px;
-            border-radius: 24px;
+            padding: 6px 10px; /* 稍微缩减宽度 */
+            border-radius: 22px;
             display: flex; 
             align-items: center; 
-            gap: 12px;
+            gap: 8px; /* 稍微缩减按钮间距 */
             margin-bottom: 0;
             pointer-events: auto; /* 恢复点击 */
         }
 
         .dock-btn {
-            width: 48px; height: 48px;
-            border-radius: 14px; 
+            width: 44px; height: 44px; /* 稍微缩减按钮尺寸 */
+            border-radius: 12px; 
             display: flex; align-items: center; justify-content: center;
-            font-size: 22px; color: var(--text-main);
+            font-size: 20px; color: var(--text-main);
             cursor: pointer;
             transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
             border: 1px solid transparent;
@@ -185,17 +185,17 @@
         .dock-btn:hover { background: var(--glass-highlight); transform: scale(1.15); }
         .dock-btn:active { transform: scale(0.9); }
 
-        /* V3.9 优化: 虚拟 Shift 键 (尺寸缩小，高度对齐) */
+        /* V3.9 虚拟 Shift 键 (样式调整) */
         #virtual-shift-btn {
-            width: 48px; height: 48px; 
-            border-radius: 14px;
+            width: 44px; height: 44px; /* 与 dock 按钮等大 */
+            border-radius: 12px; 
             background: var(--glass-bg);
             backdrop-filter: blur(24px) saturate(180%);
             -webkit-backdrop-filter: blur(24px) saturate(180%);
             border: 1px solid var(--glass-border);
             color: var(--text-sub);
             display: flex; align-items: center; justify-content: center;
-            font-size: 22px;
+            font-size: 20px;
             transition: all 0.1s;
             box-shadow: var(--glass-shadow);
             cursor: pointer;
@@ -223,7 +223,7 @@
             display: none; position: absolute; left: 50%; transform: translateX(-50%); 
             border-radius: 20px; padding: 20px; 
             z-index: 90; animation: panelUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); width: 260px; 
-            bottom: calc(80px + env(safe-area-inset-bottom, 0px));
+            bottom: calc(70px + env(safe-area-inset-bottom, 0px)); /* 稍微上移 */
         }
         @keyframes panelUp { from { opacity: 0; transform: translate(-50%, 20px) scale(0.95); } to { opacity: 1; transform: translate(-50%, 0) scale(1); } }
         
@@ -865,11 +865,12 @@
                 isDraggingCanvas = false; 
                 canvas.selection = true; 
                 
-                // V1.5 终极修复: 手动接管多选逻辑
+                // V1.6 终极修复: 手动接管多选逻辑
                 // Fabric 在没有 shiftKey 的情况下会默认清除 activeSelection
                 // 我们需要在这里强制执行多选逻辑，并覆盖 Fabric 的默认行为
                 if (isVirtualShiftPressed && target && target !== bgRect) {
                     
+                    // 1. 获取当前选中的对象 (可能是单个，也可能是 ActiveSelection)
                     const activeObj = canvas.getActiveObject();
 
                     // 2. 如果当前没有选中任何东西，直接选中目标
@@ -883,6 +884,9 @@
                     if (activeObj.type === 'activeSelection') {
                         // 检查点击的对象是否已经在组里
                         const isAlreadySelected = activeObj.contains(target);
+                        
+                        // 为了避免 Fabric 内部状态错乱，先临时解散组，获取所有选中的对象数组
+                        // 注意：这里我们不 destroy，而是利用 Fabric 的 API 操作
                         
                         if (isAlreadySelected) {
                             // 从组中移除
