@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Spark Canvas - V2.5</title>
+    <title>Spark Canvas - V2.10</title>
     
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -53,11 +53,6 @@
             opacity: 0;
             visibility: hidden;
             pointer-events: none;
-        }
-
-        /* 强制隐藏类 (用于刷新时) */
-        #splash-screen.force-hide {
-            display: none !important;
         }
 
         .splash-content {
@@ -134,30 +129,34 @@
             font-size: 18px;
             color: var(--text-sub);
             cursor: pointer; 
-            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+            transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
             border: 1px solid transparent;
         }
         
         .side-btn:hover { 
             color: var(--text-main); 
             background: var(--glass-highlight);
-            transform: translateY(-2px); 
+            transform: scale(1.15);
             border-color: rgba(255,255,255,0.1);
         }
-        .side-btn:active { transform: scale(0.92); }
+        .side-btn:active { transform: scale(0.9); }
 
         .side-btn.danger { color: #666; }
         .side-btn.danger:hover { background: rgba(255, 69, 58, 0.15); color: var(--danger-color); border-color: var(--danger-color); }
 
         /* 底部 Dock 样式 */
         .bottom-dock-container {
-            position: fixed; bottom: 15px; left: 50%; transform: translateX(-50%);
-            padding: 8px 12px;
+            position: fixed; 
+            left: 50%; 
+            transform: translateX(-50%);
+            bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+            padding: 6px 12px;
             border-radius: 24px;
-            display: flex; align-items: center; gap: 12px;
+            display: flex; 
+            align-items: center; 
+            gap: 12px;
             z-index: 100;
-            padding-bottom: calc(8px + env(safe-area-inset-bottom, 0));
-            margin-bottom: env(safe-area-inset-bottom, 0);
+            margin-bottom: 0;
         }
 
         .dock-btn {
@@ -166,18 +165,19 @@
             display: flex; align-items: center; justify-content: center;
             font-size: 22px; color: var(--text-main);
             cursor: pointer;
-            transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+            transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
             border: 1px solid transparent;
         }
 
-        .dock-btn:hover { background: var(--glass-highlight); transform: translateY(-4px); }
-        .dock-btn:active { transform: scale(0.92) translateY(-2px); }
+        .dock-btn:hover { background: var(--glass-highlight); transform: scale(1.15); }
+        .dock-btn:active { transform: scale(0.9); }
 
         /* 背景设置面板 */
         #bg-panel { 
-            display: none; position: absolute; bottom: 100px; left: 50%; transform: translateX(-50%); 
+            display: none; position: absolute; left: 50%; transform: translateX(-50%); 
             border-radius: 20px; padding: 20px; 
             z-index: 90; animation: panelUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); width: 260px; 
+            bottom: calc(80px + env(safe-area-inset-bottom, 0px));
         }
         @keyframes panelUp { from { opacity: 0; transform: translate(-50%, 20px) scale(0.95); } to { opacity: 1; transform: translate(-50%, 0) scale(1); } }
         
@@ -296,7 +296,8 @@
         .social-links { display: flex; justify-content: center; gap: 24px; margin-bottom: 8px; }
         .social-icon { font-size: 20px; color: #666; cursor: pointer; transition: all 0.2s; text-decoration: none; }
         .social-icon:hover { color: var(--text-main); transform: scale(1.1); }
-        .made-with { font-size: 11px; color: #555; }
+        
+        .made-with { font-size: 10px; color: #555; display: flex; align-items: center; justify-content: center; gap: 3px; }
 
         #file-input, #bg-file-input { display: none; }
     </style>
@@ -386,7 +387,7 @@
                     <a href="#" class="social-icon" title="X"><i class="ri-twitter-x-fill"></i></a>
                     <a href="#" class="social-icon" title="Instagram"><i class="ri-instagram-fill"></i></a>
                 </div>
-                <div class="made-with">Made with ♥️</div>
+                <div class="made-with">Made with <i class="ri-heart-fill"></i></div>
             </div>
         </div>
     </div>
@@ -479,20 +480,18 @@
     <input type="file" id="bg-file-input" accept="image/*" onchange="handleBgFile(this.files)">
 
     <script>
-        // V2.4 启动页控制逻辑 (SessionStorage 版)
+        // V2.10 启动页控制逻辑 (SessionStorage 版 + 1600ms)
         const appStartTime = Date.now();
-        const SPLASH_MIN_DURATION = 800; 
+        const SPLASH_MIN_DURATION = 1600; // V2.10: 延长到 1.6秒
         
-        let splashHidden = false; // 防止重复调用
+        let splashHidden = false; 
 
         function hideSplashScreen() {
-            // 如果已经被内联脚本隐藏了，直接返回
             const splash = document.getElementById('splash-screen');
-            if (splash.style.display === 'none') {
+            if (!splash || splash.style.display === 'none') {
                 splashHidden = true;
                 return;
             }
-
             if (splashHidden) return;
             splashHidden = true;
 
@@ -508,8 +507,8 @@
             }, remaining);
         }
         
-        // 兜底机制
-        setTimeout(hideSplashScreen, 3000);
+        // 兜底
+        setTimeout(hideSplashScreen, 4000); // 稍微放宽兜底时间
 
         const SCREEN_WIDTH = 540;
         const SCREEN_HEIGHT = 960;
@@ -623,7 +622,7 @@
             
             if(sideBarBottom) {
                 sideBarBottom.style.left = newLeft;
-                // 修正偏移: 适配更小的按钮
+                // V2.7: 更精细的底部对齐
                 sideBarBottom.style.top = (contentBottomEdge - 93) + 'px'; 
             }
         }
@@ -633,11 +632,13 @@
             const winH = window.innerHeight;
             const zoom = canvas.getZoom();
             
-            const toolbar = document.querySelector('.bottom-dock-container');
-            const toolbarHeight = toolbar ? toolbar.offsetHeight + 50 : 100;
-            const visualSpaceCenterY = (winH - toolbarHeight) / 2;
+            // V2.8 优化: 偏移视觉中心
+            const availableSpaceTop = 0;
+            const availableSpaceBottom = winH - 100; 
+            const visualSpaceCenterY = (availableSpaceTop + availableSpaceBottom) / 2;
+            
             const contentHalfHeight = (SCREEN_HEIGHT * zoom) / 2;
-            const targetY = visualSpaceCenterY - contentHalfHeight + 30;
+            const targetY = visualSpaceCenterY - contentHalfHeight + 10;
 
             const vpt = canvas.viewportTransform;
             vpt[4] = (winW / 2) - ((index * SCREEN_WIDTH + SCREEN_WIDTH / 2) * zoom);
@@ -654,8 +655,9 @@
             canvas.setWidth(winW);
             canvas.setHeight(winH);
             
-            const safeW = winW - 100; 
-            const safeH = winH - 140; 
+            // V2.7 & V2.8: 安全边距调整
+            const safeW = winW - 40; 
+            const safeH = winH - 220; 
             
             const scaleX = safeW / SCREEN_WIDTH;
             const scaleY = safeH / SCREEN_HEIGHT;
@@ -666,7 +668,7 @@
             canvas.setZoom(zoom);
 
             layoutState.visualHeight = SCREEN_HEIGHT * zoom;
-            layoutState.availableHeight = winH - 140;
+            layoutState.availableHeight = winH - 140; 
 
             focusOnPage(0);
             updateHitRegions(); 
@@ -857,6 +859,7 @@
                     clearTimeout(longPressTimer);
                 }
 
+                // V2.8 关键: 确保在移动端（visualHeight < availableHeight）时锁定 Y 轴
                 if (layoutState.visualHeight <= layoutState.availableHeight) {
                     deltaY = 0; 
                     velocityY = 0; 
