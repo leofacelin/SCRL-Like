@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Spark Canvas - V2.10</title>
+    <title>Spark Canvas - V3.7</title>
     
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -114,13 +114,10 @@
             z-index: 90;
         }
 
-        .side-bar {
-            position: fixed; top: 50%; transform: translateY(-50%);
-        }
-
-        .side-bar-bottom {
-            position: fixed; 
-        }
+        .side-bar { position: fixed; top: 50%; transform: translateY(-50%); }
+        .side-bar-bottom { position: fixed; }
+        /* V3.5: 右侧多选开关定位 */
+        .side-bar-right-bottom { position: fixed; right: 12px; z-index: 90; }
 
         .side-btn {
             width: 36px; height: 36px;
@@ -144,6 +141,14 @@
         .side-btn.danger { color: #666; }
         .side-btn.danger:hover { background: rgba(255, 69, 58, 0.15); color: var(--danger-color); border-color: var(--danger-color); }
 
+        /* V3.5: 激活状态的按钮样式 */
+        .side-btn.active {
+            color: white;
+            background: var(--accent-color);
+            border-color: var(--accent-color);
+            box-shadow: 0 0 10px rgba(10, 132, 255, 0.4);
+        }
+
         /* 底部 Dock 样式 */
         .bottom-dock-container {
             position: fixed; 
@@ -152,9 +157,7 @@
             bottom: calc(10px + env(safe-area-inset-bottom, 0px));
             padding: 6px 12px;
             border-radius: 24px;
-            display: flex; 
-            align-items: center; 
-            gap: 12px;
+            display: flex; align-items: center; gap: 12px;
             z-index: 100;
             margin-bottom: 0;
         }
@@ -168,7 +171,6 @@
             transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
             border: 1px solid transparent;
         }
-
         .dock-btn:hover { background: var(--glass-highlight); transform: scale(1.15); }
         .dock-btn:active { transform: scale(0.9); }
 
@@ -188,7 +190,6 @@
         .bg-option:hover { border-color: #fff; transform: scale(1.05); }
         .bg-option.add-btn { border: 2px dashed #555; color: #555; font-size: 24px; }
         .bg-option.add-btn:hover { border-color: #888; color: #888; }
-        
         .bg-preset-grid { width: 52px; height: 52px; display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr); gap: 4px; padding: 4px; background: rgba(255,255,255,0.05); border-radius: 14px; box-sizing: border-box; }
         .preset-dot { width: 100%; height: 100%; border-radius: 4px; cursor: pointer; border: 1px solid rgba(255,255,255,0.1); transition: transform 0.2s; }
         .preset-dot:hover { transform: scale(1.2); border-color: white; z-index: 2; }
@@ -202,7 +203,6 @@
         @keyframes menuFadeIn { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
         
         .menu-header { font-size: 10px; color: #e0e0e0; padding: 4px 8px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 2px; font-weight: 700; display: none; }
-        
         .layer-controls { display: flex; justify-content: space-between; background: rgba(255,255,255,0.05); border-radius: 10px; padding: 4px; margin-bottom: 6px; }
         .layer-btn { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: 8px; cursor: pointer; font-size: 18px; color: #ccc; transition: background 0.2s; }
         .layer-btn:hover { background: rgba(255,255,255,0.15); color: white; }
@@ -214,16 +214,7 @@
         .menu-icon-span { width: 24px; text-align: center; margin-right: 10px; font-size: 18px; }
 
         .text-colors-container { display: flex; gap: 6px; padding: 8px 4px; justify-content: space-around; border-bottom: 1px solid rgba(255,255,255,0.08); margin-bottom: 6px; }
-        
-        .text-color-dot { 
-            width: 18px; height: 18px; 
-            border-radius: 50%; 
-            cursor: pointer; 
-            border: 2px solid rgba(255,255,255,0.1); 
-            transition: transform 0.2s; 
-            flex-shrink: 0;
-            box-sizing: border-box;
-        }
+        .text-color-dot { width: 18px; height: 18px; border-radius: 50%; cursor: pointer; border: 2px solid rgba(255,255,255,0.1); transition: transform 0.2s; flex-shrink: 0; box-sizing: border-box; }
         .text-color-dot:hover { transform: scale(1.2); border-color: white; }
 
         .align-toolbar { display: flex; gap: 4px; background: rgba(255,255,255,0.05); border-radius: 10px; padding: 4px; margin-bottom: 6px; }
@@ -241,14 +232,7 @@
         .font-toggle-btn, .filter-toggle-btn { display: flex; justify-content: space-between; align-items: center; width: 100%; padding: 10px 10px; background: rgba(255,255,255,0.05); border-radius: 10px; cursor: pointer; color: #ddd; font-size: 13px; font-weight: 500; transition: background 0.2s; }
         .font-toggle-btn:hover, .filter-toggle-btn:hover { background: rgba(255,255,255,0.15); color: white; }
 
-        .popup-options-list {
-             display: none; flex-direction: column; gap: 4px;
-             position: absolute; 
-             left: calc(105% - 100px); 
-             top: 100px;
-             border-radius: 14px; padding: 6px; min-width: 110px;
-             z-index: 2001;
-        }
+        .popup-options-list { display: none; flex-direction: column; gap: 4px; position: absolute; left: calc(105% - 100px); top: 100px; border-radius: 14px; padding: 6px; min-width: 110px; z-index: 2001; }
         .popup-options-list.active { display: flex; }
         .popup-option { padding: 10px 14px; font-size: 14px; color: #ccc; cursor: pointer; border-radius: 8px; text-align: left; white-space: nowrap; transition: background 0.2s; }
         .popup-option:hover { background: var(--accent-color); color: white; }
@@ -258,27 +242,12 @@
 
         /* 模态框 */
         #confirm-modal, #info-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); backdrop-filter: blur(8px); z-index: 3000; animation: fadeIn 0.3s; }
-
-        .modal-box { 
-            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
-            background: #222; border: 1px solid #444; 
-            border-radius: 16px; padding: 15px; 
-            width: 240px; max-width: 85%; 
-            text-align: center; 
-            box-shadow: 0 25px 60px rgba(0,0,0,0.6); 
-            animation: popIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-        }
+        .modal-box { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #222; border: 1px solid #444; border-radius: 16px; padding: 15px; width: 240px; max-width: 85%; text-align: center; box-shadow: 0 25px 60px rgba(0,0,0,0.6); animation: popIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); }
         @keyframes popIn { from { opacity: 0; transform: translate(-50%, -40%) scale(0.9); } to { opacity: 1; transform: translate(-50%, -50%) scale(1); } }
-
         .modal-title { font-size: 18px; font-weight: 700; margin-bottom: 12px; color: white; letter-spacing: 0.5px; }
         .modal-desc { font-size: 14px; color: #999; margin-bottom: 24px; line-height: 1.5; }
         .modal-actions { display: flex; gap: 12px; justify-content: center; }
-        
-        .modal-btn { 
-            flex: 1; padding: 12px; border-radius: 10px; 
-            cursor: pointer; border: none; font-size: 14px; font-weight: 600; 
-            transition: transform 0.1s; 
-        }
+        .modal-btn { flex: 1; padding: 12px; border-radius: 10px; cursor: pointer; border: none; font-size: 14px; font-weight: 600; transition: transform 0.1s; }
         .modal-btn:active { transform: scale(0.95); }
         .modal-btn.cancel { background: #3a3a3c; color: #fff; }
         .modal-btn.cancel:hover { background: #48484a; }
@@ -287,16 +256,13 @@
         .modal-btn.primary { background: var(--accent-color); color: white; }
         .modal-btn.primary:hover { background: #0062cc; }
 
-        /* 信息列表 */
         .info-list { text-align: left; font-size: 14px; color: #bbb; margin-bottom: 25px; padding: 0 5px; }
         .info-item { display: flex; align-items: center; gap: 16px; margin-bottom: 16px; }
         .info-icon { font-size: 32px; width: 32px; text-align: center; color: var(--accent-color); flex-shrink: 0; }
-        
         .modal-footer { margin-top: 25px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.1); }
         .social-links { display: flex; justify-content: center; gap: 24px; margin-bottom: 8px; }
         .social-icon { font-size: 20px; color: #666; cursor: pointer; transition: all 0.2s; text-decoration: none; }
         .social-icon:hover { color: var(--text-main); transform: scale(1.1); }
-        
         .made-with { font-size: 10px; color: #555; display: flex; align-items: center; justify-content: center; gap: 3px; }
 
         #file-input, #bg-file-input { display: none; }
@@ -329,6 +295,12 @@
     <div class="side-bar-bottom side-glass-capsule">
         <div class="side-btn" onclick="showInfoModal()" title="操作指南"><i class="ri-information-line"></i></div>
         <div class="side-btn danger" onclick="showModal()" title="清空"><i class="ri-delete-bin-line"></i></div>
+    </div>
+
+    <div class="side-bar-right-bottom side-glass-capsule">
+        <div class="side-btn" id="multi-select-btn" onclick="toggleMultiSelect()" title="多选模式">
+            <i class="ri-checkbox-multiple-blank-line"></i>
+        </div>
     </div>
 
     <div class="bottom-dock-container glass-panel">
@@ -400,19 +372,15 @@
             <div class="layer-btn" onclick="menuAction('down')"><i class="ri-arrow-down-s-line"></i></div>
             <div class="layer-btn" onclick="menuAction('bottom')"><i class="ri-arrow-down-double-line"></i></div>
         </div>
-        
         <div class="menu-item show-always" id="menu-lock" onclick="menuAction('lock-toggle')">
             <i class="menu-icon-span ri-lock-line"></i> <span id="menu-lock-text">锁定</span>
         </div>
-
         <div class="menu-header image-menu-item">效果 Effect</div>
         <div class="menu-item image-menu-item" onclick="menuAction('flipX')"><i class="menu-icon-span ri-arrow-left-right-line"></i> 水平翻转</div>
         <div class="menu-item image-menu-item" onclick="menuAction('shadow')"><i class="menu-icon-span ri-drop-line"></i> 投影</div>
-
         <div class="menu-item image-menu-item" onclick="toggleFilterList()">
             <i class="menu-icon-span ri-contrast-drop-line"></i> 滤镜 Filter <i class="ri-arrow-right-s-line" id="filter-arrow-icon" style="margin-left:auto"></i>
         </div>
-
         <div id="filter-options-wrapper" class="popup-options-list glass-panel">
             <div class="popup-option" onclick="applyFilter('bw')">黑白 B&W</div>
             <div class="popup-option" onclick="applyFilter('cyber')">赛博 Cyber</div>
@@ -420,21 +388,17 @@
             <div class="popup-option" onclick="applyFilter('violet')">紫罗兰 Violet</div>
             <div class="popup-option" onclick="applyFilter('none')">无 None</div>
         </div>
-
         <div class="menu-header text-menu-item">文字设置</div>
-        
         <div class="font-selector-row text-menu-item">
             <div class="font-toggle-btn" onclick="toggleFontList()">
                 <span>字体 Font</span> <i class="ri-arrow-right-s-line" id="font-arrow-icon"></i>
             </div>
         </div>
-        
         <div id="font-options-wrapper" class="popup-options-list glass-panel">
             <div class="popup-option" style="font-family: 'Noto Sans SC', sans-serif" onclick="changeFont('\'Noto Sans SC\', sans-serif')">思源黑体</div>
             <div class="popup-option" style="font-family: 'Noto Serif SC', serif" onclick="changeFont('\'Noto Serif SC\', serif')">思源宋体</div>
             <div class="popup-option" style="font-family: 'Outfit', sans-serif" onclick="changeFont('\'Outfit\', sans-serif')">Outfit</div>
         </div>
-
         <div class="text-colors-container text-menu-item">
             <div class="text-color-dot" style="background: #000000" onclick="changeTextColor('#000000')"></div>
             <div class="text-color-dot" style="background: #ffffff" onclick="changeTextColor('#ffffff')"></div>
@@ -443,13 +407,11 @@
             <div class="text-color-dot" style="background: #007AFF" onclick="changeTextColor('#007AFF')"></div>
             <div class="text-color-dot" style="background: #FF3B30" onclick="changeTextColor('#FF3B30')"></div>
         </div>
-        
         <div class="align-toolbar text-menu-item">
             <div class="align-btn" onclick="menuAction('align-left')"><i class="ri-align-left"></i></div>
             <div class="align-btn" onclick="menuAction('align-center')"><i class="ri-align-center"></i></div>
             <div class="align-btn" onclick="menuAction('align-right')"><i class="ri-align-right"></i></div>
         </div>
-
         <div class="control-row text-menu-item">
             <span class="control-label">字重 Weight</span>
             <div class="control-group">
@@ -471,7 +433,6 @@
                 <div class="control-btn" onclick="menuAction('line-height-down')"><i class="ri-subtract-line"></i></div>
             </div>
         </div>
-
         <div class="menu-item show-always" onclick="menuAction('duplicate')"><i class="menu-icon-span ri-file-copy-line"></i> 复制</div>
         <div class="menu-item delete show-always" onclick="menuAction('delete')"><i class="menu-icon-span ri-delete-bin-line"></i> 删除</div>
     </div>
@@ -480,10 +441,8 @@
     <input type="file" id="bg-file-input" accept="image/*" onchange="handleBgFile(this.files)">
 
     <script>
-        // V2.10 启动页控制逻辑 (SessionStorage 版 + 1600ms)
         const appStartTime = Date.now();
-        const SPLASH_MIN_DURATION = 1600; // V2.10: 延长到 1.6秒
-        
+        const SPLASH_MIN_DURATION = 1600; 
         let splashHidden = false; 
 
         function hideSplashScreen() {
@@ -506,17 +465,15 @@
                 }, 600); 
             }, remaining);
         }
-        
-        // 兜底
-        setTimeout(hideSplashScreen, 4000); // 稍微放宽兜底时间
+        setTimeout(hideSplashScreen, 3000);
 
         const SCREEN_WIDTH = 540;
         const SCREEN_HEIGHT = 960;
         let screenCount = 1;
         fabric.textureSize = 2048; 
-
-        // 布局缓存
         let layoutState = { visualHeight: 0, availableHeight: 0 };
+
+        let isMultiSelectMode = false;
 
         const rotateIconImg = new Image();
         rotateIconImg.src = 'rotate.png';
@@ -555,10 +512,17 @@
             backgroundColor: null, 
             preserveObjectStacking: true, 
             fireRightClick: true, stopContextMenu: true,
-            selection: false, 
+            selection: true, 
             allowTouchScrolling: false,
             targetFindTolerance: 20 
         });
+        
+        // V3.7: 架构级 Hack - 欺骗 Fabric 认为按住了 Shift
+        // 只要开启了多选模式，Fabric 内部的所有选择逻辑都会认为 Selection Key 被按下了
+        const originalIsSelectionKeyEvent = canvas._isSelectionKeyEvent;
+        canvas._isSelectionKeyEvent = function(e) {
+            return isMultiSelectMode || originalIsSelectionKeyEvent.call(this, e);
+        }
 
         let gridLines = [];
         const contextMenu = document.getElementById('context-menu');
@@ -568,6 +532,7 @@
         const infoModal = document.getElementById('info-modal');
         const sideBar = document.querySelector('.side-bar');
         const sideBarBottom = document.querySelector('.side-bar-bottom');
+        const sideBarRightBottom = document.querySelector('.side-bar-right-bottom');
 
         const DB_NAME = "SparkCanvasDB"; const STORE_NAME = "sessions";
         let db; let saveTimeout;
@@ -575,6 +540,25 @@
         let isInternalUpdate = false;
         let currentBgFill = '#ffffff'; 
         let bgRect; 
+
+        function toggleMultiSelect() {
+            isMultiSelectMode = !isMultiSelectMode;
+            const btn = document.getElementById('multi-select-btn');
+            
+            if (isMultiSelectMode) {
+                btn.classList.add('active');
+                canvas.selection = true;
+                statusIndicator.innerText = "多选模式已开启";
+                statusIndicator.classList.add('visible');
+                setTimeout(() => statusIndicator.classList.remove('visible'), 1500);
+            } else {
+                btn.classList.remove('active');
+                // 关闭多选时，一般习惯是保留当前选中状态，不主动清除
+                statusIndicator.innerText = "多选模式已关闭";
+                statusIndicator.classList.add('visible');
+                setTimeout(() => statusIndicator.classList.remove('visible'), 1500);
+            }
+        }
 
         function updateWorkspace() {
             isInternalUpdate = true;
@@ -622,8 +606,11 @@
             
             if(sideBarBottom) {
                 sideBarBottom.style.left = newLeft;
-                // V2.7: 更精细的底部对齐
                 sideBarBottom.style.top = (contentBottomEdge - 93) + 'px'; 
+            }
+            
+            if(sideBarRightBottom) {
+                sideBarRightBottom.style.top = (contentBottomEdge - 93) + 'px'; 
             }
         }
 
@@ -632,7 +619,6 @@
             const winH = window.innerHeight;
             const zoom = canvas.getZoom();
             
-            // V2.8 优化: 偏移视觉中心
             const availableSpaceTop = 0;
             const availableSpaceBottom = winH - 100; 
             const visualSpaceCenterY = (availableSpaceTop + availableSpaceBottom) / 2;
@@ -651,11 +637,9 @@
         function initViewport() {
             const winW = window.innerWidth;
             const winH = window.innerHeight;
-            
             canvas.setWidth(winW);
             canvas.setHeight(winH);
             
-            // V2.7 & V2.8: 安全边距调整
             const safeW = winW - 40; 
             const safeH = winH - 220; 
             
@@ -758,8 +742,16 @@
 
         canvas.on('mouse:down', function(opt) {
             const evt = opt.e;
-            const target = opt.target;
+            
+            // 优先级1: 如果按了Shift 或者 开启了多选模式
+            if (evt.shiftKey || isMultiSelectMode) {
+                isDraggingCanvas = false; 
+                // V3.7: 所有的多选逻辑已经由 _isSelectionKeyEvent 自动接管
+                // 这里只需要阻止我们自定义的拖拽逻辑即可
+                return; 
+            }
 
+            const target = opt.target;
             cancelAnimationFrame(momentumID);
             velocityX = 0; velocityY = 0;
             lastMoveTime = Date.now();
@@ -780,7 +772,6 @@
                 if (!target || target === bgRect) {
                     contextMenu.style.display = 'none';
                     document.getElementById('font-options-wrapper').classList.remove('active');
-                    document.getElementById('font-arrow-icon').className = "ri-arrow-right-s-line";
                     document.getElementById('filter-options-wrapper').classList.remove('active');
                     if(document.getElementById('filter-arrow-icon')) document.getElementById('filter-arrow-icon').className = "ri-arrow-right-s-line";
                 } else {
@@ -811,6 +802,7 @@
             } else {
                 isDraggingCanvas = true;
                 mouseDownTarget = null;
+                canvas.selection = false; 
             }
             
             if (bgPanel.style.display === 'block') bgPanel.style.display = 'none';
@@ -827,10 +819,6 @@
                         openContextMenu(opt);
                     }
                 }, 500);
-            } else if (!target || target === bgRect) {
-                contextMenu.style.display = 'none';
-                document.getElementById('font-options-wrapper').classList.remove('active');
-                document.getElementById('filter-options-wrapper').classList.remove('active');
             }
         });
 
@@ -859,7 +847,6 @@
                     clearTimeout(longPressTimer);
                 }
 
-                // V2.8 关键: 确保在移动端（visualHeight < availableHeight）时锁定 Y 轴
                 if (layoutState.visualHeight <= layoutState.availableHeight) {
                     deltaY = 0; 
                     velocityY = 0; 
@@ -894,6 +881,10 @@
         });
 
         canvas.on('mouse:up', function(opt) {
+            if (!isMultiSelectMode) {
+                canvas.selection = true;
+            }
+
             const evt = opt.e;
             const pos = getClientPos(evt);
             
@@ -1072,7 +1063,6 @@
                     });
                     break;
                 case 'flipX': if(obj.type === 'image') obj.set('flipX', !obj.flipX); break;
-                // V1.5: 移除了 filter-bw case
                 case 'shadow': if (obj.type === 'image') { if (obj.shadow) { obj.set('shadow', null); } else { obj.set('shadow', new fabric.Shadow({ color: 'rgba(0,0,0,0.5)', blur: 20, offsetX: 10, offsetY: 10 })); } } break;
                 case 'spacing-up': if (obj.type === 'i-text' || obj.type === 'text') { let val = obj.charSpacing || 0; obj.set('charSpacing', val + 50); } break;
                 case 'spacing-down': if (obj.type === 'i-text' || obj.type === 'text') { let val = obj.charSpacing || 0; obj.set('charSpacing', val - 50); } break;
@@ -1230,6 +1220,29 @@
             canvas.requestRenderAll();
             triggerAutoSave();
             toggleFilterList(); 
+        }
+
+        // V3.6 修复: 默认文字使用视口中心定位
+        function addDefaultText() {
+            const center = canvas.getVpCenter();
+            const text = new fabric.IText('SparkCanvas', {
+                left: center.x, 
+                top: center.y,
+                fontFamily: "'Outfit', sans-serif", 
+                fontWeight: 600, 
+                fill: '#000000', 
+                fontSize: 40,
+                originX: 'center', 
+                originY: 'center',
+                textAlign: 'left',
+                charSpacing: 0,
+                shadow: null,
+                objectCaching: false 
+            });
+            text.setControlsVisibility({ mt: false, mb: false, ml: false, mr: false });
+            canvas.add(text);
+            // V3.6: 移除 setActiveObject
+            canvas.requestRenderAll();
         }
 
         function resizeImage(dataUrl, callback) {
@@ -1492,14 +1505,12 @@
 
         function saveState() {
             if (!db || isInternalUpdate) return;
-            // V1.8: 隐藏状态文本
             canvas.clipPath = null;
             const json = canvas.toJSON(['isBackground', 'lockMovementX', 'lockMovementY', 'lockRotation', 'lockScalingX', 'lockScalingY', 'hasControls', 'borderColor']);
             updateWorkspace(); 
             const saveData = { id: "autosave", canvas: json, screenCount: screenCount, bgFill: currentBgFill, updated: new Date().getTime() };
             const tx = db.transaction(STORE_NAME, "readwrite");
             tx.objectStore(STORE_NAME).put(saveData, "last_session");
-            // V1.8: 移除 oncomplete 中的状态更新
         }
 
         function loadState() {
@@ -1517,8 +1528,15 @@
                         });
                         objectsToRemove.forEach(obj => canvas.remove(obj));
                         updateWorkspace(); 
+                        
+                        // V3.6: 检测空状态并添加文字
+                        let hasContent = false;
                         canvas.getObjects().forEach(obj => { 
                             if(obj === bgRect) return;
+                            if (obj.type === 'image' || obj.type === 'i-text' || obj.type === 'text') {
+                                hasContent = true;
+                            }
+                            
                             if(obj.type === 'image') {
                                 obj.setControlsVisibility({ mt: false, mb: false, ml: false, mr: false });
                                 obj.set('noScaleCache', false); 
@@ -1531,15 +1549,22 @@
                                 obj.set({ hasControls: false, borderColor: '#ff453a' });
                             }
                         });
+
                         drawGrid(); 
                         initViewport(); 
-                        // V2.2 修复: 确保即使有数据加载，也执行隐藏启动页逻辑
+                        
+                        // V3.6: 在 initViewport 之后添加，确保位置正确
+                        if (!hasContent) {
+                            addDefaultText();
+                        }
+
                         hideSplashScreen(); 
                     });
                 } else { 
                     updateWorkspace(); 
                     drawGrid(); 
                     initViewport();
+                    addDefaultText();
                     hideSplashScreen(); 
                 }
             };
@@ -1548,7 +1573,6 @@
         function triggerAutoSave() {
             if(isInternalUpdate) return;
             clearTimeout(saveTimeout);
-            // V1.8: 隐藏修改中状态文本
             saveTimeout = setTimeout(saveState, 1000);
         }
 
