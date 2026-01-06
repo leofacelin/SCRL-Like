@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Spark Canvas - V1.2 (多选修复版)</title>
+    <title>Spark Canvas - V1.3 (多选完美修复版)</title>
     
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -144,18 +144,29 @@
         .side-btn.danger { color: #666; }
         .side-btn.danger:hover { background: rgba(255, 69, 58, 0.15); color: var(--danger-color); border-color: var(--danger-color); }
 
-        /* 底部 Dock 样式 */
-        .bottom-dock-container {
-            position: fixed; 
-            left: 50%; 
+        /* V3.8 新增: 底部 UI 包装器 */
+        .bottom-ui-wrapper {
+            position: fixed;
+            left: 50%;
             transform: translateX(-50%);
             bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 16px; /* 两个模块之间的间距 */
+            z-index: 100;
+            width: auto;
+        }
+
+        /* 底部 Dock 样式 (调整后) */
+        .bottom-dock-container {
+            position: relative; /* 相对 wrapper 定位 */
+            left: auto; bottom: auto; transform: none;
             padding: 6px 12px;
             border-radius: 24px;
             display: flex; 
             align-items: center; 
-            gap: 12px;
-            z-index: 100;
+            gap: 12px; /* 内部按钮间距 */
             margin-bottom: 0;
         }
 
@@ -172,23 +183,19 @@
         .dock-btn:hover { background: var(--glass-highlight); transform: scale(1.15); }
         .dock-btn:active { transform: scale(0.9); }
 
-        /* V3.7: 独立虚拟 Shift 键样式 */
+        /* V3.8: 独立虚拟 Shift 键 (样式调整) */
         #virtual-shift-btn {
-            position: fixed;
-            left: 20px;
-            bottom: calc(20px + env(safe-area-inset-bottom, 0px));
-            width: 56px; height: 56px;
-            border-radius: 50%;
+            width: 48px; height: 48px; /* 尺寸缩小，与 dock 按钮一致 */
+            border-radius: 16px; /* 形状改为圆角矩形，与整体风格统一 */
             background: var(--glass-bg);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
+            backdrop-filter: blur(24px) saturate(180%);
+            -webkit-backdrop-filter: blur(24px) saturate(180%);
             border: 1px solid var(--glass-border);
             color: var(--text-sub);
             display: flex; align-items: center; justify-content: center;
-            font-size: 24px;
-            z-index: 110;
-            transition: all 0.1s cubic-bezier(0.25, 0.8, 0.25, 1);
-            box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+            font-size: 20px;
+            transition: all 0.1s;
+            box-shadow: var(--glass-shadow);
             cursor: pointer;
         }
 
@@ -359,15 +366,17 @@
         <div class="side-btn danger" onclick="showModal()" title="清空"><i class="ri-delete-bin-line"></i></div>
     </div>
 
-    <div id="virtual-shift-btn" title="多选模式 (按住)">
-        <i class="ri-checkbox-multiple-blank-line"></i>
-    </div>
+    <div class="bottom-ui-wrapper">
+        <div id="virtual-shift-btn" title="多选模式 (按住)">
+            <i class="ri-checkbox-multiple-blank-line"></i>
+        </div>
 
-    <div class="bottom-dock-container glass-panel">
-        <div class="dock-btn" onclick="document.getElementById('file-input').click()" title="添加图片"><i class="ri-image-add-line"></i></div>
-        <div class="dock-btn" onclick="addText()" title="添加文字"><i class="ri-text"></i></div>
-        <div class="dock-btn" onclick="toggleBgPanel()" title="背景设置"><i class="ri-palette-line"></i></div>
-        <div class="dock-btn" onclick="exportContent()" title="导出"><i class="ri-download-2-line"></i></div>
+        <div class="bottom-dock-container glass-panel">
+            <div class="dock-btn" onclick="document.getElementById('file-input').click()" title="添加图片"><i class="ri-image-add-line"></i></div>
+            <div class="dock-btn" onclick="addText()" title="添加文字"><i class="ri-text"></i></div>
+            <div class="dock-btn" onclick="toggleBgPanel()" title="背景设置"><i class="ri-palette-line"></i></div>
+            <div class="dock-btn" onclick="exportContent()" title="导出"><i class="ri-download-2-line"></i></div>
+        </div>
     </div>
 
     <div id="bg-panel" class="glass-panel">
@@ -840,56 +849,66 @@
             const isShiftActive = evt.shiftKey || isVirtualShiftPressed;
 
             if (isShiftActive) {
-                // 如果按住了 Shift (或虚拟键)：
-                // 1. 禁止画布拖拽
-                // 2. 开启 Fabric 的框选
                 isDraggingCanvas = false; 
                 canvas.selection = true; 
                 
-                // V3.7 修复: 手动处理虚拟键的点选逻辑
-                // 因为 Fabric 默认只认物理 shiftKey 来追加选择，这里我们需要手动干预
+                // V3.9 终极修复: 手动接管多选逻辑
+                // Fabric 在没有 shiftKey 的情况下会默认清除 activeSelection
+                // 我们需要在这里强制执行多选逻辑，并覆盖 Fabric 的默认行为
                 if (isVirtualShiftPressed && target && target !== bgRect) {
+                    
+                    // 1. 获取当前选中的对象 (可能是单个，也可能是 ActiveSelection)
                     const activeObj = canvas.getActiveObject();
 
-                    if (activeObj) {
-                        // Case 1: 当前已经是多选组 (ActiveSelection)
-                        if (activeObj.type === 'activeSelection') {
-                            if (activeObj.contains(target)) {
-                                // 如果点的是已选中的，移除它
-                                activeObj.removeWithUpdate(target);
-                                if (activeObj.size() === 0) canvas.discardActiveObject();
-                                else if (activeObj.size() === 1) {
-                                    // 剩下一个时，转回单选对象
-                                    const onlyObj = activeObj.getObjects()[0];
-                                    canvas.discardActiveObject();
-                                    canvas.setActiveObject(onlyObj);
-                                }
-                            } else {
-                                // 如果点的是未选中的，加进去
-                                activeObj.addWithUpdate(target);
-                            }
-                        } 
-                        // Case 2: 当前是单选对象，且点的不是自己 (target !== activeObj)
-                        else if (activeObj !== target) {
-                            // 创建新的多选组
-                            const newSelection = new fabric.ActiveSelection([activeObj, target], {
-                                canvas: canvas
-                            });
-                            canvas.setActiveObject(newSelection);
-                        }
-                        // Case 3: 当前是单选，点的就是自己 -> 既然是Shift模式，通常是取消选择
-                        else {
-                             canvas.discardActiveObject();
-                        }
-                    } else {
-                        // Case 4: 当前没选中任何东西 -> 选中目标
+                    // 2. 如果当前没有选中任何东西，直接选中目标
+                    if (!activeObj) {
                         canvas.setActiveObject(target);
+                        canvas.requestRenderAll();
+                        return;
                     }
+
+                    // 3. 如果当前是多选组
+                    if (activeObj.type === 'activeSelection') {
+                        // 检查点击的对象是否已经在组里
+                        const isAlreadySelected = activeObj.contains(target);
+                        
+                        // 为了避免 Fabric 内部状态错乱，先临时解散组，获取所有选中的对象数组
+                        // 注意：这里我们不 destroy，而是利用 Fabric 的 API 操作
+                        
+                        if (isAlreadySelected) {
+                            // 从组中移除
+                            activeObj.removeWithUpdate(target);
+                            // 如果移完了只剩一个，Fabric 会自动转为单选，或者我们需要手动处理
+                            if (activeObj.size() === 0) {
+                                canvas.discardActiveObject();
+                            } else if (activeObj.size() === 1) {
+                                const only = activeObj.getObjects()[0];
+                                canvas.discardActiveObject();
+                                canvas.setActiveObject(only);
+                            }
+                        } else {
+                            // 添加到组
+                            activeObj.addWithUpdate(target);
+                        }
+                    } 
+                    // 4. 如果当前是单选 (且点的不是同一个对象)
+                    else if (activeObj !== target) {
+                        // 创建新的多选组
+                        const newSelection = new fabric.ActiveSelection([activeObj, target], {
+                            canvas: canvas
+                        });
+                        canvas.setActiveObject(newSelection);
+                    }
+                    // 5. 如果点的是同一个单选对象 -> 在多选模式下通常意味着“取消选择”
+                    else {
+                        canvas.discardActiveObject();
+                    }
+
                     canvas.requestRenderAll();
-                    return; // 阻止 Fabric 默认的单选逻辑重置选择
+                    return; // 关键：结束函数，防止后续逻辑干扰
                 }
                 
-                return; // 框选逻辑交给 Fabric 自动处理
+                return; // 如果是点在空白处，交给 Fabric 处理框选
             }
 
             // --- 以下是原有的非 Shift 逻辑 ---
