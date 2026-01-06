@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Spark Canvas - V1.5 (连续多选完美修复)</title>
+    <title>Spark Canvas - V1.6 (多选最终修复版)</title>
     
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -604,13 +604,12 @@
             backgroundColor: null, 
             preserveObjectStacking: true, 
             fireRightClick: true, stopContextMenu: true,
-            selection: true, // V3.4 核心修复: 默认开启选择功能，这是 Shift 多选生效的前提
+            selection: true, // V3.4 核心修复: 默认开启选择功能
             allowTouchScrolling: false,
             targetFindTolerance: 20 
         });
 
         // V3.6 核心修复: 直接在原型上修改 ActiveSelection 的默认配置
-        // 这样无论何时进行多选，产生的选区框都会自动隐藏上下左右控制点
         fabric.ActiveSelection.prototype.setControlsVisibility({
             mt: false, // 隐藏上中
             mb: false, // 隐藏下中
@@ -622,30 +621,27 @@
         let isVirtualShiftPressed = false;
         const virtualShiftBtn = document.getElementById('virtual-shift-btn');
 
-        // V1.4 新增: 重写 Fabric 内部判定 Shift 键的方法
-        // 这是解决 "点选多选" 失效的根本方法
-        // 只要虚拟键被按住，Fabric 就认为 Shift 被按下了，从而自动处理添加/删除选择
+        // V1.4 重写: 辅助判定
         const originalIsSelectionKeyPressed = fabric.Canvas.prototype._isSelectionKeyPressed;
         fabric.Canvas.prototype._isSelectionKeyPressed = function(e) {
             return isVirtualShiftPressed || (e && e.shiftKey);
         };
 
-        // 使用 touchstart/end 响应更即时，且支持多点触控（左手按键，右手画框）
+        // 使用 touchstart/end 响应更即时
         virtualShiftBtn.addEventListener('touchstart', (e) => {
-            e.preventDefault(); // 防止触发点击或滚动
+            e.preventDefault(); 
             isVirtualShiftPressed = true;
             virtualShiftBtn.classList.add('active');
-            canvas.selection = true; // 强制允许框选
+            canvas.selection = true; 
         }, { passive: false });
 
         virtualShiftBtn.addEventListener('touchend', (e) => {
             e.preventDefault();
             isVirtualShiftPressed = false;
             virtualShiftBtn.classList.remove('active');
-            // 松开后，具体的 selection 状态会在下一次点击时由 mouse:down 逻辑决定
         }, { passive: false });
         
-        // 兼容鼠标操作（可选，用于在电脑上测试）
+        // 兼容鼠标操作
         virtualShiftBtn.addEventListener('mousedown', () => {
             isVirtualShiftPressed = true;
             virtualShiftBtn.classList.add('active');
@@ -672,16 +668,16 @@
         let currentBgFill = '#ffffff'; 
         let bgRect; 
 
-        // --- V1.5 修复: 多选状态保护变量 ---
-        let lastSelectedObjects = [];
+        // --- V1.6 最终绝杀: 强行状态托管 ---
+        let selectionBeforeClick = [];
 
-        // 在点击发生"前"一瞬间，记录当前选了什么
+        // 1. 在点击发生前，把当前的名单强行克隆一份（浅拷贝数组，防止引用丢失）
         canvas.on('mouse:down:before', function(opt) {
             const evt = opt.e;
             const isShift = isVirtualShiftPressed || (evt && evt.shiftKey);
-            // 只有在按住 Shift 时才记录，用于后续恢复
             if (isShift) {
-                lastSelectedObjects = canvas.getActiveObjects();
+                // 关键点: [...array] 强制复制，切断引用联系
+                selectionBeforeClick = [...canvas.getActiveObjects()];
             }
         });
 
@@ -731,7 +727,6 @@
             
             if(sideBarBottom) {
                 sideBarBottom.style.left = newLeft;
-                // V2.7: 更精细的底部对齐
                 sideBarBottom.style.top = (contentBottomEdge - 93) + 'px'; 
             }
         }
@@ -741,7 +736,6 @@
             const winH = window.innerHeight;
             const zoom = canvas.getZoom();
             
-            // V2.8 优化: 偏移视觉中心
             const availableSpaceTop = 0;
             const availableSpaceBottom = winH - 100; 
             const visualSpaceCenterY = (availableSpaceTop + availableSpaceBottom) / 2;
@@ -764,7 +758,6 @@
             canvas.setWidth(winW);
             canvas.setHeight(winH);
             
-            // V2.7 & V2.8: 安全边距调整
             const safeW = winW - 40; 
             const safeH = winH - 220; 
             
@@ -824,7 +817,6 @@
             
             let isLocked = target.lockMovementX;
 
-            // V3.5 新增: 如果是多选组，检查组内第一个对象的状态
             if (target.type === 'activeSelection' && target._objects && target._objects.length > 0) {
                 isLocked = target._objects[0].lockMovementX;
             }
@@ -872,43 +864,49 @@
             });
         }
 
-        // --- 重写后的 mouse:down 逻辑 (V1.5) ---
+        // --- V1.6 重写后的 mouse:down 逻辑 ---
         canvas.on('mouse:down', function(opt) {
             const evt = opt.e;
             const target = opt.target;
 
-            // V3.7 核心修复: 合并 物理Shift键 和 虚拟Shift键 的状态
+            // 检测 Shift 状态
             const isShiftActive = evt.shiftKey || isVirtualShiftPressed;
 
             if (isShiftActive) {
-                // 如果按住了 Shift (或虚拟键)：
                 isDraggingCanvas = false; 
                 canvas.selection = true; 
 
-                // --- V1.5 核心补丁: 强制连续多选逻辑 ---
-                // 如果点击了有效对象(非背景)，且 Fabric 错误地重置了选区(变成了单选新对象)，我们需要手动修正
+                // --- V1.6 核心: 手动管理 Toggle 逻辑 ---
                 if (target && target !== bgRect) {
-                    const currentActive = canvas.getActiveObjects();
+                    // 获取刚才存下的"旧名单" (确保是数组)
+                    const existingObjects = selectionBeforeClick || [];
                     
-                    // 判断条件:
-                    // 1. 当前变成了只选中 1 个对象 (说明之前的组被丢了)
-                    // 2. 这个对象就是我们刚点的 target (说明 Fabric 执行了"新单选"逻辑)
-                    // 3. 之前的选区里有东西 (lastSelectedObjects > 0)
-                    // 4. 这个 target 之前不在选区里 (说明是想添加新对象)
-                    const isSingleNew = currentActive.length === 1 && currentActive[0] === target;
-                    const wasNotPreviouslySelected = !lastSelectedObjects.includes(target);
-
-                    if (isSingleNew && wasNotPreviouslySelected && lastSelectedObjects.length > 0) {
-                        // 执行手动合并: 旧选区 + 新对象
-                        const newSelection = new fabric.ActiveSelection([...lastSelectedObjects, target], {
-                            canvas: canvas
-                        });
-                        canvas.setActiveObject(newSelection);
-                        canvas.requestRenderAll();
+                    // 检查当前点击的目标在不在旧名单里
+                    const index = existingObjects.indexOf(target);
+                    
+                    let newSelectionList;
+                    
+                    if (index > -1) {
+                        // 如果已经在名单里 -> 踢出去 (反选)
+                        newSelectionList = existingObjects.filter(o => o !== target);
+                    } else {
+                        // 如果不在名单里 -> 加进去 (增选)
+                        newSelectionList = [...existingObjects, target];
                     }
+
+                    // 强制更新选区
+                    if (newSelectionList.length > 0) {
+                        // 建立新的选区组
+                        const activeSel = new fabric.ActiveSelection(newSelectionList, { canvas: canvas });
+                        canvas.setActiveObject(activeSel);
+                    } else {
+                        // 如果空了，就清空
+                        canvas.discardActiveObject();
+                    }
+                    canvas.requestRenderAll();
                 }
                 // -------------------------------------
-                return; 
+                return; // 直接结束，不让 Fabric 默认逻辑干扰
             }
 
             // --- 以下是原有的非 Shift 逻辑 (保持不变) ---
@@ -928,17 +926,15 @@
             lastX = pos.x; lastY = pos.y;
             mouseDownPoint = { x: pos.x, y: pos.y };
 
-            // 点击空白处: 临时关闭选区框，开启拖拽
             if (!target || target === bgRect) {
                 contextMenu.style.display = 'none';
                 document.getElementById('font-options-wrapper').classList.remove('active');
                 document.getElementById('filter-options-wrapper').classList.remove('active');
                 
-                canvas.selection = false; // 拖拽画布时禁止蓝框
+                canvas.selection = false; 
                 isDraggingCanvas = true;
                 mouseDownTarget = null;
             } else {
-                // 点击物体
                 isDraggingCanvas = false;
                 
                 const currentType = getBroadType(target.type);
@@ -1031,7 +1027,6 @@
         });
 
         canvas.on('mouse:up', function(opt) {
-            // V3.4: 鼠标松开后，恢复默认的选择能力
             canvas.selection = true;
 
             const evt = opt.e;
@@ -1175,7 +1170,6 @@
             const obj = canvas.getActiveObject(); if (!obj) return;
             switch(action) {
                 case 'lock-toggle':
-                    // V3.5 新增: 锁定/解锁 辅助函数
                     const toggleLock = (targetObj, shouldLock) => {
                         if (shouldLock) {
                             targetObj.set({
@@ -1192,22 +1186,16 @@
                         }
                     };
 
-                    let nextState = true; // 默认为锁定
+                    let nextState = true; 
                     
-                    // 判断当前状态
                     if (obj.type === 'activeSelection') {
-                        // 如果是多选，以第一个子对象的状态为准取反
                         if (obj._objects.length > 0 && obj._objects[0].lockMovementX) {
                             nextState = false;
                         }
-                        // 遍历应用状态
                         obj.forEachObject(subObj => toggleLock(subObj, nextState));
-                        
-                        // 同时锁定/解锁 选区框本身，防止整体拖动
                         toggleLock(obj, nextState); 
                         
                     } else {
-                        // 单选逻辑
                         if (obj.lockMovementX) nextState = false;
                         toggleLock(obj, nextState);
                     }
@@ -1221,7 +1209,6 @@
                 case 'up': obj.bringForward(); break; case 'down': obj.sendBackwards(); break;
                 
                 case 'delete': 
-                    // V3.5 新增: 多选删除支持
                     if (obj.type === 'activeSelection') {
                         obj.forEachObject(subObj => canvas.remove(subObj));
                         canvas.discardActiveObject();
@@ -1247,7 +1234,6 @@
                     });
                     break;
                 case 'flipX': if(obj.type === 'image') obj.set('flipX', !obj.flipX); break;
-                // V1.5: 移除了 filter-bw case
                 case 'shadow': if (obj.type === 'image') { if (obj.shadow) { obj.set('shadow', null); } else { obj.set('shadow', new fabric.Shadow({ color: 'rgba(0,0,0,0.5)', blur: 20, offsetX: 10, offsetY: 10 })); } } break;
                 case 'spacing-up': if (obj.type === 'i-text' || obj.type === 'text') { let val = obj.charSpacing || 0; obj.set('charSpacing', val + 50); } break;
                 case 'spacing-down': if (obj.type === 'i-text' || obj.type === 'text') { let val = obj.charSpacing || 0; obj.set('charSpacing', val - 50); } break;
@@ -1288,9 +1274,8 @@
             const type = target.type;
             const imageItems = document.querySelectorAll('.image-menu-item');
             const textItems = document.querySelectorAll('.text-menu-item');
-            const layerControls = document.querySelector('.layer-controls'); // 获取图层控制条
+            const layerControls = document.querySelector('.layer-controls'); 
 
-            // V3.5 新增: 多选时隐藏图层调整选项
             if (type === 'activeSelection') {
                 layerControls.style.display = 'none';
             } else {
@@ -1345,7 +1330,6 @@
             const list = document.getElementById('font-options-wrapper');
             const arrow = document.getElementById('font-arrow-icon');
             list.classList.toggle('active');
-            // 关闭其他弹窗
             document.getElementById('filter-options-wrapper').classList.remove('active');
             
             if(list.classList.contains('active')) {
@@ -1415,7 +1399,6 @@
             toggleFilterList(); 
         }
 
-        // V3.0 Helper
         function addDefaultText() {
             const text = new fabric.IText('SparkCanvas', {
                 left: SCREEN_WIDTH / 2, 
@@ -1478,10 +1461,7 @@
             screenCount = 1; 
             currentBgFill = '#ffffff'; 
             updateWorkspace();
-            
-            // V1.1 优化: 清空后添加默认文字
             addDefaultText();
-            
             initViewport();
             if(db) { const tx = db.transaction(STORE_NAME, "readwrite"); tx.objectStore(STORE_NAME).delete("last_session"); }
             closeModal();
@@ -1700,14 +1680,12 @@
 
         function saveState() {
             if (!db || isInternalUpdate) return;
-            // V1.8: 隐藏状态文本
             canvas.clipPath = null;
             const json = canvas.toJSON(['isBackground', 'lockMovementX', 'lockMovementY', 'lockRotation', 'lockScalingX', 'lockScalingY', 'hasControls', 'borderColor']);
             updateWorkspace(); 
             const saveData = { id: "autosave", canvas: json, screenCount: screenCount, bgFill: currentBgFill, updated: new Date().getTime() };
             const tx = db.transaction(STORE_NAME, "readwrite");
             tx.objectStore(STORE_NAME).put(saveData, "last_session");
-            // V1.8: 移除 oncomplete 中的状态更新
         }
 
         function loadState() {
@@ -1726,7 +1704,6 @@
                         objectsToRemove.forEach(obj => canvas.remove(obj));
                         updateWorkspace(); 
                         
-                        // V3.0: 检测空状态并添加文字
                         let hasContent = false;
                         canvas.getObjects().forEach(obj => { 
                             if(obj === bgRect) return;
@@ -1758,7 +1735,6 @@
                 } else { 
                     updateWorkspace(); 
                     drawGrid(); 
-                    // V3.0: 新会话加默认文字
                     addDefaultText();
                     initViewport();
                     hideSplashScreen(); 
@@ -1769,7 +1745,6 @@
         function triggerAutoSave() {
             if(isInternalUpdate) return;
             clearTimeout(saveTimeout);
-            // V1.8: 隐藏修改中状态文本
             saveTimeout = setTimeout(saveState, 1000);
         }
 
