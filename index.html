@@ -3,7 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Spark Canvas</title>
+    
+    <title>Spark Canvas v1.19</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%235213dc'/><path d='M50 20 C50 20 60 40 80 50 C60 60 50 80 50 80 C50 80 40 60 20 50 C40 40 50 20 50 20 Z' fill='white'/></svg>">
     
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -17,13 +19,12 @@
     <style>
         :root { 
             --bg-color: #121212; 
-            /* 玻璃拟态变量 */
             --glass-bg: rgba(30, 30, 30, 0.65); 
             --glass-border: rgba(255, 255, 255, 0.1);
             --glass-highlight: rgba(255, 255, 255, 0.05);
             --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
             
-            --accent-color: #0A84FF; 
+            --accent-color: #5213dc; 
             --danger-color: #FF453A; 
             --text-main: #FFFFFF;
             --text-sub: #8E8E93;
@@ -40,7 +41,6 @@
             -webkit-user-select: none; user-select: none;
         }
 
-        /* 启动页样式 */
         #splash-screen {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background-color: var(--bg-color);
@@ -88,7 +88,6 @@
         .canvas-container { margin: 0 auto; background: transparent !important; }
         canvas { background: transparent !important; }
 
-        /* --- 玻璃拟态基础类 --- */
         .glass-panel {
             background: var(--glass-bg);
             backdrop-filter: blur(24px) saturate(180%);
@@ -98,7 +97,6 @@
             box-sizing: border-box;
         }
 
-        /* 侧边栏样式 */
         .side-glass-capsule {
             background: var(--glass-bg);
             backdrop-filter: blur(24px) saturate(180%);
@@ -106,8 +104,10 @@
             border: 1px solid var(--glass-border);
             box-shadow: var(--glass-shadow);
             box-sizing: border-box;
-            border-radius: 18px; 
-            padding: 5px; 
+            
+            border-radius: 20px; 
+            padding: 6px; 
+            
             display: flex; 
             flex-direction: column; 
             gap: 6px;
@@ -115,7 +115,7 @@
         }
 
         .side-bar {
-            position: fixed; top: 50%; transform: translateY(-50%);
+            position: fixed; 
         }
 
         .side-bar-bottom {
@@ -124,7 +124,8 @@
 
         .side-btn {
             width: 36px; height: 36px;
-            border-radius: 12px;
+            border-radius: 14px;
+            
             display: flex; align-items: center; justify-content: center;
             font-size: 18px;
             color: var(--text-sub);
@@ -144,7 +145,6 @@
         .side-btn.danger { color: #666; }
         .side-btn.danger:hover { background: rgba(255, 69, 58, 0.15); color: var(--danger-color); border-color: var(--danger-color); }
 
-        /* V3.8 底部 UI 包装器 */
         .bottom-ui-wrapper {
             position: fixed;
             left: 50%;
@@ -152,29 +152,30 @@
             bottom: calc(10px + env(safe-area-inset-bottom, 0px));
             display: flex;
             align-items: center;
-            justify-content: center; /* 确保子元素整体居中 */
-            gap: 16px; /* Shift键和Dock之间的间距 */
+            justify-content: center; 
+            gap: 16px; 
             z-index: 100;
-            width: 100%; /* 宽度铺满以支持居中计算 */
-            pointer-events: none; /* 让 wrapper 不遮挡下方点击，子元素开启 */
+            width: 100%; 
+            pointer-events: none; 
         }
 
-        /* 底部 Dock 样式 */
         .bottom-dock-container {
-            position: relative; /* 相对 wrapper 定位 */
+            position: relative; 
             left: auto; bottom: auto; transform: none;
-            padding: 6px 12px;
-            border-radius: 24px;
+            
+            padding: 10px;
+            border-radius: 28px;
+            
             display: flex; 
             align-items: center; 
             gap: 12px;
             margin-bottom: 0;
-            pointer-events: auto; /* 恢复点击 */
+            pointer-events: auto; 
         }
 
         .dock-btn {
             width: 48px; height: 48px;
-            border-radius: 14px; 
+            border-radius: 18px; 
             display: flex; align-items: center; justify-content: center;
             font-size: 22px; color: var(--text-main);
             cursor: pointer;
@@ -185,61 +186,96 @@
         .dock-btn:hover { background: var(--glass-highlight); transform: scale(1.15); }
         .dock-btn:active { transform: scale(0.9); }
 
-        /* V1.4: 独立虚拟 Shift 键 (缩小尺寸以匹配 Dock) */
         #virtual-shift-btn {
             width: 48px; height: 48px; 
-            border-radius: 14px; /* 与 dock 按钮圆角一致 */
+            border-radius: 18px; 
             background: var(--glass-bg);
             backdrop-filter: blur(24px) saturate(180%);
             -webkit-backdrop-filter: blur(24px) saturate(180%);
             border: 1px solid var(--glass-border);
             color: var(--text-sub);
             display: flex; align-items: center; justify-content: center;
-            font-size: 22px;
+            
+            font-family: 'Outfit', sans-serif;
+            font-size: 11px; 
+            font-weight: 800;
+            letter-spacing: 0.5px;
+            
             transition: all 0.1s;
             box-shadow: var(--glass-shadow);
             cursor: pointer;
-            pointer-events: auto; /* 恢复点击 */
+            pointer-events: auto; 
         }
 
-        /* 激活状态 */
         #virtual-shift-btn.active {
             background-color: var(--accent-color);
             color: white !important;
             transform: scale(0.95);
             border-color: var(--accent-color);
-            box-shadow: 0 0 15px rgba(10, 132, 255, 0.4);
+            box-shadow: 0 0 15px rgba(82, 19, 220, 0.4);
         }
 
-        /* V1.4 关键更新: 桌面端隐藏虚拟 Shift 键 */
-        @media (min-width: 768px) {
+        @media (min-width: 768px) and (pointer: fine) {
             #virtual-shift-btn {
                 display: none !important;
             }
         }
 
-        /* 背景设置面板 */
         #bg-panel { 
             display: none; position: absolute; left: 50%; transform: translateX(-50%); 
-            border-radius: 20px; padding: 20px; 
-            z-index: 90; animation: panelUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); width: 260px; 
+            
+            border-radius: 20px; 
+            padding: 10px 14px 14px 14px; 
+            
+            z-index: 90; animation: panelUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); 
+            width: 210px; 
             bottom: calc(80px + env(safe-area-inset-bottom, 0px));
+            
+            margin-left: 32px;
         }
+        
+        @media (min-width: 768px) and (pointer: fine) {
+            #bg-panel { margin-left: 0; }
+        }
+
         @keyframes panelUp { from { opacity: 0; transform: translate(-50%, 20px) scale(0.95); } to { opacity: 1; transform: translate(-50%, 0) scale(1); } }
         
-        .panel-title { font-size: 11px; color: #e0e0e0; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 1px; text-align: center; font-weight: 700; }
+        .panel-title { font-size: 10px; color: #e0e0e0; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px; text-align: center; font-weight: 700; }
         
-        .bg-options { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
-        .bg-option { width: 52px; height: 52px; border-radius: 14px; border: 2px solid #444; cursor: pointer; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; background-size: cover; background-position: center; transition: all 0.2s; }
-        .bg-option:hover { border-color: #fff; transform: scale(1.05); }
-        .bg-option.add-btn { border: 2px dashed #555; color: #555; font-size: 24px; }
-        .bg-option.add-btn:hover { border-color: #888; color: #888; }
+        .bg-options { display: flex; justify-content: space-between; gap: 8px; align-items: center; }
         
-        .bg-preset-grid { width: 52px; height: 52px; display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr); gap: 4px; padding: 4px; background: rgba(255,255,255,0.05); border-radius: 14px; box-sizing: border-box; }
-        .preset-dot { width: 100%; height: 100%; border-radius: 4px; cursor: pointer; border: 1px solid rgba(255,255,255,0.1); transition: transform 0.2s; }
-        .preset-dot:hover { transform: scale(1.2); border-color: white; z-index: 2; }
+        .bg-option { 
+            width: 44px; height: 44px; 
+            
+            border-radius: 16px; 
+            
+            border: 2px solid rgba(255,255,255,0.1); 
+            cursor: pointer; 
+            display: flex; align-items: center; justify-content: center; 
+            overflow: hidden; position: relative; 
+            background: rgba(255,255,255,0.05);
+            transition: all 0.2s; 
+            color: #ddd;
+            flex-shrink: 0; 
+        }
+        .bg-option:hover { border-color: #fff; transform: scale(1.05); color: white; background: rgba(255,255,255,0.1); }
+        .bg-option:active { transform: scale(0.95); }
 
-        /* 上下文菜单 */
+        .ratio-toggle {
+            font-family: 'Outfit', sans-serif;
+            font-weight: 700;
+            font-size: 14px; 
+            letter-spacing: 0.5px;
+        }
+
+        .color-input-wrapper input[type="color"] {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            opacity: 0; cursor: pointer;
+        }
+        
+        .bg-option i { font-size: 20px; }
+
         #context-menu { 
             display: none; position: absolute; z-index: 2000; width: 170px; 
             border-radius: 16px; padding: 6px; 
@@ -258,6 +294,8 @@
         .menu-item.delete { color: var(--danger-color); margin-top: 6px; border-top: 1px solid rgba(255,255,255,0.08); border-radius: 0 0 10px 10px; padding-top: 12px; }
         .menu-item.delete:hover { background: var(--danger-color); color: white; }
         .menu-icon-span { width: 24px; text-align: center; margin-right: 10px; font-size: 18px; }
+
+        #menu-lock { display: none !important; }
 
         .text-colors-container { display: flex; gap: 6px; padding: 8px 4px; justify-content: space-around; border-bottom: 1px solid rgba(255,255,255,0.08); margin-bottom: 6px; }
         
@@ -302,21 +340,29 @@
         .show-always { display: flex !important; }
         .show-header { display: block !important; }
 
-        /* 模态框 */
         #confirm-modal, #info-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); backdrop-filter: blur(8px); z-index: 3000; animation: fadeIn 0.3s; }
 
         .modal-box { 
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
             background: #222; border: 1px solid #444; 
-            border-radius: 16px; padding: 15px; 
-            width: 240px; max-width: 85%; 
+            border-radius: 16px; 
+            
+            /* [V1.19 UI Tweaks] Increased padding + increased width to maintain inner content width */
+            padding: 35px; 
+            width: 280px; 
+            max-width: 85%; 
+            
             text-align: center; 
             box-shadow: 0 25px 60px rgba(0,0,0,0.6); 
             animation: popIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
         }
         @keyframes popIn { from { opacity: 0; transform: translate(-50%, -40%) scale(0.9); } to { opacity: 1; transform: translate(-50%, -50%) scale(1); } }
 
-        .modal-title { font-size: 18px; font-weight: 700; margin-bottom: 12px; color: white; letter-spacing: 0.5px; }
+        .modal-title { 
+            font-size: 18px; font-weight: 700; 
+            margin-bottom: 32px; /* [V1.19] Increased margin below title */
+            color: white; letter-spacing: 0.5px; 
+        }
         .modal-desc { font-size: 14px; color: #999; margin-bottom: 24px; line-height: 1.5; }
         .modal-actions { display: flex; gap: 12px; justify-content: center; }
         
@@ -330,14 +376,34 @@
         .modal-btn.cancel:hover { background: #48484a; }
         .modal-btn.confirm { background: var(--danger-color); color: white; }
         .modal-btn.confirm:hover { background: #ff5b50; }
+        
         .modal-btn.primary { background: var(--accent-color); color: white; }
-        .modal-btn.primary:hover { background: #0062cc; }
+        .modal-btn.primary:hover { background: #3a32db; }
 
-        /* 信息列表 */
         .info-list { text-align: left; font-size: 14px; color: #bbb; margin-bottom: 25px; padding: 0 5px; }
-        .info-item { display: flex; align-items: center; gap: 16px; margin-bottom: 16px; }
+        
+        .info-item { 
+            display: flex; align-items: center; gap: 16px; 
+            margin-bottom: 16px; 
+            padding-bottom: 16px; 
+            border-bottom: 1px solid rgba(255,255,255,0.1); /* [V1.19] Added separator */
+        }
+        /* Last item has no border */
+        .info-item:last-child {
+            border-bottom: none;
+            margin-bottom: 25px;
+            padding-bottom: 0;
+        }
+
         .info-icon { font-size: 32px; width: 32px; text-align: center; color: var(--accent-color); flex-shrink: 0; }
         
+        /* [V1.19] Class for uniform text sizing in info modal */
+        .info-text-line {
+            display: block;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
         .modal-footer { margin-top: 25px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.1); }
         .social-links { display: flex; justify-content: center; gap: 24px; margin-bottom: 8px; }
         .social-icon { font-size: 20px; color: #666; cursor: pointer; transition: all 0.2s; text-decoration: none; }
@@ -378,35 +444,28 @@
 
     <div class="bottom-ui-wrapper">
         <div id="virtual-shift-btn" title="多选模式 (按住)">
-            <i class="ri-checkbox-multiple-blank-line"></i>
+            Shift
         </div>
 
         <div class="bottom-dock-container glass-panel">
             <div class="dock-btn" onclick="document.getElementById('file-input').click()" title="添加图片"><i class="ri-image-add-line"></i></div>
             <div class="dock-btn" onclick="addText()" title="添加文字"><i class="ri-text"></i></div>
-            <div class="dock-btn" onclick="toggleBgPanel()" title="背景设置"><i class="ri-palette-line"></i></div>
+            <div class="dock-btn" onclick="toggleBgPanel()" title="画布设置"><i class="ri-settings-4-line"></i></div> 
             <div class="dock-btn" onclick="exportContent()" title="导出"><i class="ri-download-2-line"></i></div>
         </div>
     </div>
 
     <div id="bg-panel" class="glass-panel">
-        <div class="panel-title">背景设置</div>
+        <div class="panel-title">画布设置</div>
         <div class="bg-options">
-            <div class="bg-option color-input-wrapper" title="自定义颜色">
+            
+            <div class="bg-option ratio-toggle" onclick="toggleAspectRatio()" id="ratio-toggle-btn" title="切换比例">1:1</div>
+
+            <div class="bg-option color-input-wrapper" id="color-picker-btn" title="背景颜色" style="background-color: #ffffff">
                 <input type="color" id="bg-picker" value="#ffffff" onchange="changeBackgroundColor(this.value)">
             </div>
-            <div class="bg-preset-grid">
-                <div class="preset-dot" style="background:#ffffff" onclick="changeBackgroundColor('#ffffff')"></div>
-                <div class="preset-dot" style="background:#f2f2f7" onclick="changeBackgroundColor('#f2f2f7')"></div>
-                <div class="preset-dot" style="background:#1c1c1e" onclick="changeBackgroundColor('#1c1c1e')"></div>
-                <div class="preset-dot" style="background:#fdf6e3" onclick="changeBackgroundColor('#fdf6e3')"></div>
-                <div class="preset-dot" style="background:#ffeff0" onclick="changeBackgroundColor('#ffeff0')"></div>
-                <div class="preset-dot" style="background:#eef6ff" onclick="changeBackgroundColor('#eef6ff')"></div>
-                <div class="preset-dot" style="background:#d4d4d4" onclick="changeBackgroundColor('#d4d4d4')"></div>
-                <div class="preset-dot" style="background:#333333" onclick="changeBackgroundColor('#333333')"></div>
-                <div class="preset-dot" style="background:#000000" onclick="changeBackgroundColor('#000000')"></div>
-            </div>
-            <div class="bg-option add-btn" onclick="document.getElementById('bg-file-input').click()"><i class="ri-add-line"></i></div>
+
+            <div class="bg-option add-btn" onclick="document.getElementById('bg-file-input').click()" title="图片背景"><i class="ri-image-2-line"></i></div>
         </div>
     </div>
 
@@ -425,8 +484,24 @@
         <div class="modal-box">
             <div class="modal-title">Spark Canvas</div>
             <div class="info-list">
-                <div class="info-item"><i class="info-icon ri-computer-line"></i> <span>图片/文字上 <b>右键</b> 唤起菜单</span></div>
-                <div class="info-item"><i class="info-icon ri-smartphone-line"></i> <span>图片/文字上 <b>长按</b> 唤起菜单</span></div>
+                <div class="info-item">
+                    <i class="info-icon ri-computer-line"></i>
+                    <div>
+                        <span class="info-text-line">图片/文字上 <b>右键</b> 唤起菜单</span>
+                        <span class="info-text-line">按住 Shift <b>框选/多选</b> 对象</span>
+                    </div>
+                </div>
+                <div class="info-item">
+                    <i class="info-icon ri-smartphone-line"></i> 
+                    <div>
+                        <span class="info-text-line">图片/文字上 <b>长按</b> 唤起菜单</span>
+                        <span class="info-text-line">按住 虚拟Shift <b>框选</b> 对象</span>
+                    </div>
+                </div>
+                <div class="info-item">
+                    <i class="info-icon ri-fullscreen-line"></i> 
+                    <span class="info-text-line">双击图片 <b>铺满/切换</b> 模式</span>
+                </div>
             </div>
             <div class="modal-actions">
                 <button class="modal-btn primary" onclick="closeInfoModal()">知道了</button>
@@ -491,7 +566,7 @@
             <div class="text-color-dot" style="background: #ffffff" onclick="changeTextColor('#ffffff')"></div>
             <div class="text-color-dot" style="background: #FFCC00" onclick="changeTextColor('#FFCC00')"></div>
             <div class="text-color-dot" style="background: #34C759" onclick="changeTextColor('#34C759')"></div>
-            <div class="text-color-dot" style="background: #007AFF" onclick="changeTextColor('#007AFF')"></div>
+            <div class="text-color-dot" style="background: #5213dc" onclick="changeTextColor('#5213dc')"></div>
             <div class="text-color-dot" style="background: #FF3B30" onclick="changeTextColor('#FF3B30')"></div>
         </div>
         
@@ -560,7 +635,7 @@
         setTimeout(hideSplashScreen, 3000);
 
         const SCREEN_WIDTH = 540;
-        const SCREEN_HEIGHT = 960;
+        let SCREEN_HEIGHT = 960; // 默认 9:16
         let screenCount = 1;
         fabric.textureSize = 2048; 
 
@@ -574,7 +649,9 @@
         function renderCustomIcon(ctx, left, top, styleOverride, fabricObject) {
             const size = 20; 
             ctx.save(); ctx.translate(left, top); ctx.rotate(fabric.util.degreesToRadians(fabricObject.angle));
-            ctx.beginPath(); ctx.arc(0, 0, size/2, 0, 2 * Math.PI); ctx.fillStyle = "#007AFF"; ctx.fill();
+            
+            ctx.beginPath(); ctx.arc(0, 0, size/2, 0, 2 * Math.PI); ctx.fillStyle = "#5213dc"; ctx.fill();
+            
             ctx.shadowColor = "rgba(0,0,0,0.3)"; ctx.shadowBlur = 3; ctx.shadowOffsetY = 1;
             const iconSize = size * 0.7; 
             if (rotateIconImg.complete && rotateIconImg.naturalWidth !== 0) {
@@ -587,7 +664,7 @@
 
         fabric.Object.prototype.set({
             snapAngle: 90, snapThreshold: 3,
-            cornerStyle: 'circle', cornerColor: '#007AFF', borderColor: '#007AFF',
+            cornerStyle: 'circle', cornerColor: '#5213dc', borderColor: '#5213dc',
             transparentCorners: false, borderScaleFactor: 2, cornerSize: 10,
             centeredScaling: false, lockUniScaling: true,
             lockMovementX: false, lockMovementY: false
@@ -599,53 +676,273 @@
             cursorStyle: 'crosshair', render: renderCustomIcon, actionName: 'rotate'
         });
 
+        // -----------------------------------------------------------
+        // V0.95 Feature: Canvas Lock/Unlock Control
+        // -----------------------------------------------------------
+        
+        function getRemixIconChar(className) {
+            const el = document.createElement('i');
+            el.className = className;
+            el.style.position = 'absolute'; 
+            el.style.visibility = 'hidden';
+            document.body.appendChild(el);
+            const content = window.getComputedStyle(el, ':before').getPropertyValue('content');
+            document.body.removeChild(el);
+            return content.replace(/['"]/g, '');
+        }
+
+        let ICON_LOCK = '🔒';
+        let ICON_UNLOCK = '🔓';
+        
+        setTimeout(() => {
+            ICON_LOCK = getRemixIconChar('ri-lock-line') || '🔒';
+            ICON_UNLOCK = getRemixIconChar('ri-lock-unlock-line') || '🔓';
+        }, 1000);
+
+        function renderLockIcon(ctx, left, top, styleOverride, fabricObject) {
+            const size = 20; 
+            let isLocked = fabricObject.lockMovementX;
+            if (fabricObject.type === 'activeSelection' && fabricObject._objects?.length > 0) {
+                 if (fabricObject._objects[0].lockMovementX) isLocked = true;
+            }
+
+            ctx.save();
+            ctx.translate(left, top);
+            ctx.rotate(fabric.util.degreesToRadians(fabricObject.angle));
+            
+            ctx.beginPath();
+            ctx.arc(0, 0, size/2, 0, 2 * Math.PI);
+            
+            if (isLocked) {
+                ctx.fillStyle = "#FF453A"; 
+            } else {
+                ctx.fillStyle = "#34C759"; 
+            }
+            ctx.fill();
+            
+            ctx.fillStyle = "#FFFFFF";
+            ctx.font = "normal 12px remixicon";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillText(isLocked ? ICON_LOCK : ICON_UNLOCK, 0, 0.5);
+            
+            ctx.restore();
+        }
+
+        function updateVisualState(target, isLocked) {
+            if (!target) return;
+            
+            if (isLocked && target.isEditing) {
+                target.exitEditing();
+            }
+
+            if (isLocked) {
+                target.set('hasControls', true); 
+                target.setControlsVisibility({
+                    tl: false, tr: false, bl: false, br: false, mtr: false, 
+                    ml: false, mr: false, mt: false, mb: false
+                });
+                target.set('borderColor', '#FF453A');
+                target.set('cornerColor', 'transparent');
+            } else {
+                target.set('hasControls', true);
+                target.setControlsVisibility({
+                    tl: true, tr: true, bl: true, br: true, mtr: true,
+                    ml: false, mr: false, mt: false, mb: false
+                });
+                target.set('borderColor', '#5213dc');
+                target.set('cornerColor', '#5213dc');
+            }
+        }
+
+        function toggleLockHandler(eventData, transformData) {
+            const target = transformData.target;
+            let isLocked = target.lockMovementX;
+            if (target.type === 'activeSelection' && target._objects.length > 0) {
+                isLocked = target._objects[0].lockMovementX;
+            }
+            
+            const nextStateLocked = !isLocked;
+            const lockProps = {
+                lockMovementX: nextStateLocked, lockMovementY: nextStateLocked,
+                lockRotation: nextStateLocked, lockScalingX: nextStateLocked, lockScalingY: nextStateLocked
+            };
+
+            if (target.type === 'activeSelection') {
+                target.forEachObject(o => o.set(lockProps));
+                target.set(lockProps);
+            } else {
+                target.set(lockProps);
+            }
+
+            updateVisualState(target, nextStateLocked);
+            target.canvas.requestRenderAll();
+            triggerAutoSave();
+            return true;
+        }
+
+        fabric.Object.prototype.controls.lockCtrl = new fabric.Control({
+            x: 0.5, y: -0.5,
+            offsetX: 0, offsetY: -25,
+            cursorStyle: 'pointer',
+            actionName: 'toggleLock',
+            mouseUpHandler: toggleLockHandler,
+            render: renderLockIcon,
+            sizeX: 24, sizeY: 24 
+        });
+
+        // -----------------------------------------------------------
+
         const canvas = new fabric.Canvas('c', {
             width: window.innerWidth, height: window.innerHeight,
             backgroundColor: null, 
             preserveObjectStacking: true, 
             fireRightClick: true, stopContextMenu: true,
-            selection: true, // V3.4 核心修复: 默认开启选择功能，这是 Shift 多选生效的前提
+            selection: true, 
             allowTouchScrolling: false,
             targetFindTolerance: 20 
         });
 
-        // V3.6 核心修复: 直接在原型上修改 ActiveSelection 的默认配置
-        // 这样无论何时进行多选，产生的选区框都会自动隐藏上下左右控制点
-        fabric.ActiveSelection.prototype.setControlsVisibility({
-            mt: false, // 隐藏上中
-            mb: false, // 隐藏下中
-            ml: false, // 隐藏左中
-            mr: false  // 隐藏右中
+        // ==========================================
+        // 1. 修复：强制 Cover 算法 (无视 DPI/视网膜屏差异)
+        // ==========================================
+        function handleImageSmartToggle(target) {
+            // 排除无关对象
+            if (!target || target.type !== 'image' || target === bgRect) return;
+
+            // --- 分支 A：解绑 (移除遮罩) ---
+            if (target.clipPath) {
+                target.set('clipPath', null);
+                target.dirty = true;
+                canvas.requestRenderAll();
+                triggerAutoSave();
+                console.log("[Toggle] Mask Removed (Free Mode)");
+                return;
+            }
+
+            // --- 分支 B：铺满 (添加遮罩) ---
+            const screenW = SCREEN_WIDTH;
+            const screenH = SCREEN_HEIGHT;
+
+            // 计算归属页面
+            const objCenter = target.getCenterPoint();
+            let pageIndex = Math.floor(objCenter.x / screenW);
+            if (pageIndex < 0) pageIndex = 0;
+            if (pageIndex >= screenCount) pageIndex = screenCount - 1;
+
+            // 目标位置
+            const destX = (pageIndex * screenW) + (screenW / 2);
+            const destY = screenH / 2;
+
+            // 1. 强制重置状态，确保计算基于原始尺寸
+            target.set({
+                angle: 0,
+                scaleX: 1,
+                scaleY: 1
+            });
+
+            // 2. 核心修复：纯数学计算 Cover 比例 (CSS Object-Fit: Cover 算法)
+            // 分别计算宽度填满和高度填满所需的缩放倍率
+            const scaleToFillWidth = screenW / target.width;
+            const scaleToFillHeight = screenH / target.height;
+
+            // 取两者的最大值，确保短边也能填满
+            const finalScale = Math.max(scaleToFillWidth, scaleToFillHeight);
+
+            // 3. 应用缩放和定位
+            target.set({
+                scaleX: finalScale,
+                scaleY: finalScale,
+                left: destX, 
+                top: destY,
+                originX: 'center', 
+                originY: 'center'
+            });
+
+            // 4. 添加遮罩 (不可交互)
+            const clipRect = new fabric.Rect({
+                left: pageIndex * screenW, top: 0,
+                width: screenW, height: screenH,
+                absolutePositioned: true,
+                evented: false, 
+                selectable: false
+            });
+            
+            target.set('clipPath', clipRect);
+
+            // 5. 刷新
+            target.setCoords();
+            canvas.requestRenderAll();
+            triggerAutoSave();
+            console.log(`[Toggle] Cover Mode | Scale: ${finalScale.toFixed(4)}`);
+        }
+
+        // ==========================================
+        // 2. 桌面端监听 (复用逻辑) + 文字双击编辑
+        // ==========================================
+        canvas.on('mouse:dblclick', function(opt) {
+            const target = opt.target;
+            if (!target) return;
+
+            // 图片 Toggle 逻辑
+            if (target.type === 'image') {
+                handleImageSmartToggle(target);
+            }
+            // [V1.17] 桌面端文字双击才进入编辑
+            else if ((target.type === 'i-text' || target.type === 'text') && !target.lockMovementX) {
+                target.set('editable', true);
+                target.enterEditing();
+                target.selectAll();
+            }
         });
 
-        // V3.7 核心: 虚拟 Shift 键逻辑
+        function handleLockStateSelection(e) {
+            const target = e.selected ? e.selected[0] : e.target;
+            if (!target) return;
+            
+            let isLocked = target.lockMovementX;
+            if (target.type === 'activeSelection' && target._objects?.length > 0) {
+                isLocked = target._objects[0].lockMovementX;
+            }
+            updateVisualState(target, isLocked);
+        }
+        canvas.on('selection:created', handleLockStateSelection);
+        canvas.on('selection:updated', handleLockStateSelection);
+
+        let isTextEditingMode = false;
+        canvas.on('text:editing:entered', () => { isTextEditingMode = true; });
+        
+        // [V1.17] 退出编辑后，强制锁住 editable，防止单击误触
+        canvas.on('text:editing:exited', (e) => { 
+            isTextEditingMode = false;
+            if(e.target) e.target.set('editable', false);
+        });
+
+        fabric.ActiveSelection.prototype.setControlsVisibility({
+            mt: false, mb: false, ml: false, mr: false 
+        });
+
         let isVirtualShiftPressed = false;
         const virtualShiftBtn = document.getElementById('virtual-shift-btn');
 
-        // V1.4 新增: 重写 Fabric 内部判定 Shift 键的方法
-        // 这是解决 "点选多选" 失效的根本方法
-        // 只要虚拟键被按住，Fabric 就认为 Shift 被按下了，从而自动处理添加/删除选择
         const originalIsSelectionKeyPressed = fabric.Canvas.prototype._isSelectionKeyPressed;
         fabric.Canvas.prototype._isSelectionKeyPressed = function(e) {
             return isVirtualShiftPressed || (e && e.shiftKey);
         };
 
-        // 使用 touchstart/end 响应更即时，且支持多点触控（左手按键，右手画框）
         virtualShiftBtn.addEventListener('touchstart', (e) => {
-            e.preventDefault(); // 防止触发点击或滚动
+            e.preventDefault(); 
             isVirtualShiftPressed = true;
             virtualShiftBtn.classList.add('active');
-            canvas.selection = true; // 强制允许框选
+            canvas.selection = true; 
         }, { passive: false });
 
         virtualShiftBtn.addEventListener('touchend', (e) => {
             e.preventDefault();
             isVirtualShiftPressed = false;
             virtualShiftBtn.classList.remove('active');
-            // 松开后，具体的 selection 状态会在下一次点击时由 mouse:down 逻辑决定
         }, { passive: false });
         
-        // 兼容鼠标操作（可选，用于在电脑上测试）
         virtualShiftBtn.addEventListener('mousedown', () => {
             isVirtualShiftPressed = true;
             virtualShiftBtn.classList.add('active');
@@ -664,6 +961,7 @@
         const infoModal = document.getElementById('info-modal');
         const sideBar = document.querySelector('.side-bar');
         const sideBarBottom = document.querySelector('.side-bar-bottom');
+        const ratioToggleBtn = document.getElementById('ratio-toggle-btn'); 
 
         const DB_NAME = "SparkCanvasDB"; const STORE_NAME = "sessions";
         let db; let saveTimeout;
@@ -672,6 +970,50 @@
         let currentBgFill = '#ffffff'; 
         let bgRect; 
 
+        // V1.10 Update: Close panel after toggle
+        function toggleAspectRatio() {
+            const OLD_HEIGHT = SCREEN_HEIGHT;
+            let NEW_HEIGHT;
+            let btnText;
+
+            if (Math.abs(OLD_HEIGHT - 960) < 5) {
+                // Current: 9:16 -> Target: 1:1 -> Next Button: 3:4
+                NEW_HEIGHT = 540;
+                btnText = "3:4";
+            } else if (Math.abs(OLD_HEIGHT - 540) < 5) {
+                // Current: 1:1 -> Target: 3:4 -> Next Button: 9:16
+                NEW_HEIGHT = 720;
+                btnText = "9:16";
+            } else {
+                // Current: 3:4 -> Target: 9:16 -> Next Button: 1:1
+                NEW_HEIGHT = 960;
+                btnText = "1:1";
+            }
+
+            const heightDiff = NEW_HEIGHT - OLD_HEIGHT;
+            const offset = heightDiff / 2;
+
+            canvas.getObjects().forEach(obj => {
+                if (obj.isBackground || obj.excludeFromExport) return;
+                
+                obj.top += offset;
+                obj.setCoords(); 
+            });
+
+            SCREEN_HEIGHT = NEW_HEIGHT;
+            if(ratioToggleBtn) ratioToggleBtn.innerText = btnText;
+
+            updateWorkspace(); 
+            drawGrid();
+            initViewport();
+            triggerAutoSave();
+            
+            canvas.requestRenderAll();
+            
+            // V1.10 Add: Close panel immediately
+            bgPanel.style.display = 'none';
+        }
+
         function updateWorkspace() {
             isInternalUpdate = true;
             if (bgRect && canvas.contains(bgRect)) canvas.remove(bgRect);
@@ -679,7 +1021,7 @@
             bgRect = new fabric.Rect({
                 left: 0, top: 0,
                 width: screenCount * SCREEN_WIDTH,
-                height: SCREEN_HEIGHT,
+                height: SCREEN_HEIGHT, 
                 fill: currentBgFill,
                 selectable: false, evented: false, 
                 isBackground: true 
@@ -690,18 +1032,12 @@
             canvas.clipPath = new fabric.Rect({
                 left: 0, top: 0,
                 width: screenCount * SCREEN_WIDTH,
-                height: SCREEN_HEIGHT,
+                height: SCREEN_HEIGHT, 
                 absolutePositioned: false 
             });
 
-            gridLines.forEach(l => canvas.remove(l)); 
-            gridLines = [];
-            for (let i = 1; i < screenCount; i++) {
-                const line = new fabric.Line([i * SCREEN_WIDTH, 0, i * SCREEN_WIDTH, SCREEN_HEIGHT], {
-                    stroke: '#007AFF', strokeWidth: 1, strokeDashArray: [5, 5], opacity: 0.3, selectable: false, evented: false, excludeFromExport: true
-                });
-                canvas.add(line); gridLines.push(line);
-            }
+            drawGrid();
+
             isInternalUpdate = false;
         }
 
@@ -711,14 +1047,16 @@
             const zoom = canvas.getZoom();
             
             const contentRightEdge = vpt[4] + (screenCount * SCREEN_WIDTH * zoom);
+            const contentTopEdge = vpt[5]; 
             const contentBottomEdge = vpt[5] + (SCREEN_HEIGHT * zoom);
+
             const newLeft = (contentRightEdge + 12) + 'px'; 
             
             sideBar.style.left = newLeft; 
+            sideBar.style.top = contentTopEdge + 'px'; 
             
             if(sideBarBottom) {
                 sideBarBottom.style.left = newLeft;
-                // V2.7: 更精细的底部对齐
                 sideBarBottom.style.top = (contentBottomEdge - 93) + 'px'; 
             }
         }
@@ -728,13 +1066,22 @@
             const winH = window.innerHeight;
             const zoom = canvas.getZoom();
             
-            // V2.8 优化: 偏移视觉中心
-            const availableSpaceTop = 0;
-            const availableSpaceBottom = winH - 100; 
-            const visualSpaceCenterY = (availableSpaceTop + availableSpaceBottom) / 2;
+            const isMobile = winW < 768; 
             
-            const contentHalfHeight = (SCREEN_HEIGHT * zoom) / 2;
-            const targetY = visualSpaceCenterY - contentHalfHeight + 10;
+            let targetY;
+            if (isMobile) {
+                const availableSpaceTop = 30; 
+                const availableSpaceBottom = winH - 160; 
+                const visualSpaceCenterY = (availableSpaceTop + availableSpaceBottom) / 2;
+                const contentHalfHeight = (SCREEN_HEIGHT * zoom) / 2;
+                targetY = visualSpaceCenterY - contentHalfHeight;
+            } else {
+                const availableSpaceTop = 0;
+                const availableSpaceBottom = winH - 100;
+                const visualSpaceCenterY = (availableSpaceTop + availableSpaceBottom) / 2;
+                const contentHalfHeight = (SCREEN_HEIGHT * zoom) / 2;
+                targetY = visualSpaceCenterY - contentHalfHeight + 10;
+            }
 
             const vpt = canvas.viewportTransform;
             vpt[4] = (winW / 2) - ((index * SCREEN_WIDTH + SCREEN_WIDTH / 2) * zoom);
@@ -747,16 +1094,16 @@
         function initViewport() {
             const winW = window.innerWidth;
             const winH = window.innerHeight;
+            const isMobile = winW < 768;
             
             canvas.setWidth(winW);
             canvas.setHeight(winH);
             
-            // V2.7 & V2.8: 安全边距调整
-            const safeW = winW - 40; 
-            const safeH = winH - 220; 
+            const safeW = winW - (isMobile ? 34 : 40); 
+            const safeH = winH - (isMobile ? 160 : 220); 
             
             const scaleX = safeW / SCREEN_WIDTH;
-            const scaleY = safeH / SCREEN_HEIGHT;
+            const scaleY = safeH / SCREEN_HEIGHT; 
             let zoom = Math.min(scaleX, scaleY);
             
             if (zoom > 1) zoom = 1; 
@@ -811,7 +1158,6 @@
             
             let isLocked = target.lockMovementX;
 
-            // V3.5 新增: 如果是多选组，检查组内第一个对象的状态
             if (target.type === 'activeSelection' && target._objects && target._objects.length > 0) {
                 isLocked = target._objects[0].lockMovementX;
             }
@@ -828,8 +1174,17 @@
         function getCanvasBounds() {
             const winW = window.innerWidth;
             const zoom = canvas.getZoom();
+            
+            const totalContentW = screenCount * SCREEN_WIDTH * zoom;
             const maxLeft = (winW / 2) - (SCREEN_WIDTH * zoom / 2);
-            const minLeft = (winW / 2) - ((screenCount * SCREEN_WIDTH - SCREEN_WIDTH/2) * zoom);
+            let minLeft = (winW / 2) - ((screenCount * SCREEN_WIDTH - SCREEN_WIDTH/2) * zoom);
+            const sidebarSafeWidth = 80; 
+            const minLeftForSidebar = winW - totalContentW - sidebarSafeWidth;
+            
+            if (minLeftForSidebar < minLeft) {
+                minLeft = minLeftForSidebar;
+            }
+
             return { min: minLeft, max: maxLeft };
         }
 
@@ -859,24 +1214,72 @@
             });
         }
 
+        // ==========================================
+        // 3. mouse:down (加入移动端双击判定 & 菜单关闭优化)
+        // ==========================================
+        
+        let lastTapTime = 0;
+        let lastTapTarget = null;
+
         canvas.on('mouse:down', function(opt) {
             const evt = opt.e;
-            const target = opt.target;
+            let target = opt.target;
+            const now = Date.now();
 
-            // V3.7 核心修复: 合并 物理Shift键 和 虚拟Shift键 的状态
+            // --- [优化 2] 点击画布任何位置(左键)，如果有菜单打开，先关闭 ---
+            // 排除右键点击 (button 3)，因为右键负责打开菜单
+            if (opt.button !== 3 && contextMenu.style.display === 'block') {
+                contextMenu.style.display = 'none';
+                document.getElementById('font-options-wrapper').classList.remove('active');
+                document.getElementById('filter-options-wrapper').classList.remove('active');
+            }
+
+            // --- [核心修复] 移动端双击检测逻辑 ---
+            if (evt.type === 'touchstart' && target && target === lastTapTarget && (now - lastTapTime < 300)) {
+                // 如果是图片 -> 铺满 Toggle
+                if (target.type === 'image') {
+                    handleImageSmartToggle(target);
+                }
+                // [V1.17] 如果是文字 -> 开启编辑
+                else if ((target.type === 'i-text' || target.type === 'text') && !target.lockMovementX) {
+                    target.set('editable', true);
+                    target.enterEditing();
+                    target.selectAll();
+                }
+
+                lastTapTime = 0;
+                lastTapTarget = null;
+                isDraggingCanvas = false;
+                return; 
+            }
+            lastTapTime = now;
+            lastTapTarget = target;
+            // ------------------------------------
+
             const isShiftActive = evt.shiftKey || isVirtualShiftPressed;
 
             if (isShiftActive) {
-                // 如果按住了 Shift (或虚拟键)：
-                // 1. 禁止画布拖拽
-                // 2. 开启 Fabric 的框选
-                // 3. 多选逻辑现在由 _isSelectionKeyPressed 覆盖自动处理
                 isDraggingCanvas = false; 
                 canvas.selection = true; 
                 return; 
             }
+            
+            if (isTextEditingMode) return;
 
-            // --- 以下是原有的非 Shift 逻辑 ---
+            const pointer = canvas.getPointer(evt); 
+            const artboardW = screenCount * SCREEN_WIDTH;
+            const artboardH = SCREEN_HEIGHT;
+            
+            const isOutsideArtboard = pointer.x < 0 || pointer.x > artboardW || pointer.y < 0 || pointer.y > artboardH;
+            
+            if (isOutsideArtboard) {
+                canvas.discardActiveObject();
+                canvas._currentTransform = null; 
+                canvas.requestRenderAll();
+                target = null; 
+                opt.target = null;
+            }
+
             cancelAnimationFrame(momentumID);
             velocityX = 0; velocityY = 0;
             lastMoveTime = Date.now();
@@ -893,19 +1296,19 @@
             lastX = pos.x; lastY = pos.y;
             mouseDownPoint = { x: pos.x, y: pos.y };
 
-            // 点击空白处: 临时关闭选区框，开启拖拽
             if (!target || target === bgRect) {
+                // 背景点击：确保关闭所有菜单
                 contextMenu.style.display = 'none';
                 document.getElementById('font-options-wrapper').classList.remove('active');
                 document.getElementById('filter-options-wrapper').classList.remove('active');
                 
-                canvas.selection = false; // 拖拽画布时禁止蓝框
+                canvas.selection = false; 
                 isDraggingCanvas = true;
                 mouseDownTarget = null;
             } else {
-                // 点击物体
                 isDraggingCanvas = false;
                 
+                // [优化] 虽然前面已经处理了关闭，这里为了保险起见，如果类型变化了也要更新状态
                 const currentType = getBroadType(target.type);
                 const menuType = contextMenu.dataset.currentType; 
                 if (currentType !== menuType && contextMenu.style.display === 'block') {
@@ -913,9 +1316,10 @@
                 }
                 
                 if (target.lockMovementX) {
-                    isDraggingCanvas = true;
-                    mouseDownTarget = target; 
-                    canvas.discardActiveObject(); 
+                    if (!target.__corner) {
+                         isDraggingCanvas = true;
+                         mouseDownTarget = target; 
+                    }
                     canvas.requestRenderAll();
                 }
             }
@@ -923,9 +1327,19 @@
             if (bgPanel.style.display === 'block') bgPanel.style.display = 'none';
             
             if (target && target !== bgRect && evt.type === 'touchstart') {
+                // --- [优化 1] 如果已经是双指接触，不触发长按菜单 ---
+                if (evt.touches && evt.touches.length > 1) return;
+
                 if (target.__corner) return;
                 longPressTimer = setTimeout(() => {
                     const active = canvas.getActiveObject();
+                    
+                    if ((target.type === 'i-text' || target.type === 'text')) {
+                        // 长按时依然禁止编辑
+                        target.set('editable', false);
+                        target.__tempDisableEdit = true;
+                    }
+
                     if (isDraggingCanvas && Math.abs(lastX - pos.x) < 5 && Math.abs(lastY - pos.y) < 5) {
                         isDraggingCanvas = false; 
                         canvas.setActiveObject(target); 
@@ -939,6 +1353,8 @@
 
         let isObjectMoving = false;
         canvas.on('mouse:move', function(opt) {
+            if (isTextEditingMode) return;
+
             if (isDraggingCanvas) {
                 const evt = opt.e;
                 const pos = getClientPos(evt);
@@ -996,7 +1412,6 @@
         });
 
         canvas.on('mouse:up', function(opt) {
-            // V3.4: 鼠标松开后，恢复默认的选择能力
             canvas.selection = true;
 
             const evt = opt.e;
@@ -1034,6 +1449,13 @@
             canvas.setViewportTransform(canvas.viewportTransform); 
             updateSideBarPosition();
             updateHitRegions(); 
+
+            if (opt.target && opt.target.__tempDisableEdit) {
+                 if (!opt.target.lockMovementX) {
+                      // 这里不做任何操作，因为我们不想单击进入编辑
+                 }
+                 delete opt.target.__tempDisableEdit;
+            }
         });
 
         function applyMomentum() {
@@ -1087,6 +1509,9 @@
 
         canvas.upperCanvasEl.addEventListener('touchstart', function(e) {
             if (e.touches.length === 2) {
+                // --- [优化 1] 双指操作立即取消长按定时器 ---
+                clearTimeout(longPressTimer);
+                
                 isDraggingCanvas = false; 
                 const pointer0 = canvas.getPointer(e.touches[0]); 
                 let target = canvas.findTarget(e); 
@@ -1140,53 +1565,13 @@
             const obj = canvas.getActiveObject(); if (!obj) return;
             switch(action) {
                 case 'lock-toggle':
-                    // V3.5 新增: 锁定/解锁 辅助函数
-                    const toggleLock = (targetObj, shouldLock) => {
-                        if (shouldLock) {
-                            targetObj.set({
-                                lockMovementX: true, lockMovementY: true,
-                                lockRotation: true, lockScalingX: true, lockScalingY: true,
-                                hasControls: false, borderColor: '#ff453a'
-                            });
-                        } else {
-                            targetObj.set({
-                                lockMovementX: false, lockMovementY: false,
-                                lockRotation: false, lockScalingX: false, lockScalingY: false,
-                                hasControls: true, borderColor: '#007AFF'
-                            });
-                        }
-                    };
-
-                    let nextState = true; // 默认为锁定
-                    
-                    // 判断当前状态
-                    if (obj.type === 'activeSelection') {
-                        // 如果是多选，以第一个子对象的状态为准取反
-                        if (obj._objects.length > 0 && obj._objects[0].lockMovementX) {
-                            nextState = false;
-                        }
-                        // 遍历应用状态
-                        obj.forEachObject(subObj => toggleLock(subObj, nextState));
-                        
-                        // 同时锁定/解锁 选区框本身，防止整体拖动
-                        toggleLock(obj, nextState); 
-                        
-                    } else {
-                        // 单选逻辑
-                        if (obj.lockMovementX) nextState = false;
-                        toggleLock(obj, nextState);
-                    }
-
-                    canvas.requestRenderAll();
-                    triggerAutoSave();
-                    updateContextMenuState(obj); 
-                    break;
+                      toggleLockHandler(null, {target: obj});
+                      break;
 
                 case 'top': obj.bringToFront(); break; case 'bottom': obj.sendToBack(); break;
                 case 'up': obj.bringForward(); break; case 'down': obj.sendBackwards(); break;
                 
                 case 'delete': 
-                    // V3.5 新增: 多选删除支持
                     if (obj.type === 'activeSelection') {
                         obj.forEachObject(subObj => canvas.remove(subObj));
                         canvas.discardActiveObject();
@@ -1200,7 +1585,11 @@
                     obj.clone(function(cloned) {
                         canvas.discardActiveObject();
                         cloned.set({ left: obj.left + 20, top: obj.top + 20, evented: true });
-                        if(cloned.type === 'i-text' || cloned.type === 'text') cloned.set('objectCaching', false);
+                        if(cloned.type === 'i-text' || cloned.type === 'text') {
+                            cloned.set('objectCaching', false);
+                            // [V1.17] 复制时也保持不可编辑
+                            cloned.set('editable', false);
+                        }
                         if (cloned.type === 'activeSelection') {
                             cloned.canvas = canvas;
                             cloned.forEachObject(function(o) { canvas.add(o); });
@@ -1212,7 +1601,6 @@
                     });
                     break;
                 case 'flipX': if(obj.type === 'image') obj.set('flipX', !obj.flipX); break;
-                // V1.5: 移除了 filter-bw case
                 case 'shadow': if (obj.type === 'image') { if (obj.shadow) { obj.set('shadow', null); } else { obj.set('shadow', new fabric.Shadow({ color: 'rgba(0,0,0,0.5)', blur: 20, offsetX: 10, offsetY: 10 })); } } break;
                 case 'spacing-up': if (obj.type === 'i-text' || obj.type === 'text') { let val = obj.charSpacing || 0; obj.set('charSpacing', val + 50); } break;
                 case 'spacing-down': if (obj.type === 'i-text' || obj.type === 'text') { let val = obj.charSpacing || 0; obj.set('charSpacing', val - 50); } break;
@@ -1253,9 +1641,8 @@
             const type = target.type;
             const imageItems = document.querySelectorAll('.image-menu-item');
             const textItems = document.querySelectorAll('.text-menu-item');
-            const layerControls = document.querySelector('.layer-controls'); // 获取图层控制条
+            const layerControls = document.querySelector('.layer-controls'); 
 
-            // V3.5 新增: 多选时隐藏图层调整选项
             if (type === 'activeSelection') {
                 layerControls.style.display = 'none';
             } else {
@@ -1310,7 +1697,6 @@
             const list = document.getElementById('font-options-wrapper');
             const arrow = document.getElementById('font-arrow-icon');
             list.classList.toggle('active');
-            // 关闭其他弹窗
             document.getElementById('filter-options-wrapper').classList.remove('active');
             
             if(list.classList.contains('active')) {
@@ -1380,24 +1766,43 @@
             toggleFilterList(); 
         }
 
-        // V3.0 Helper
         function addDefaultText() {
-            const text = new fabric.IText('SparkCanvas', {
+            const center = canvas.getVpCenter();
+
+            const title = new fabric.IText('SparkCanvas', {
                 left: SCREEN_WIDTH / 2, 
-                top: SCREEN_HEIGHT / 2,
+                top: SCREEN_HEIGHT / 2 - 12,
                 fontFamily: "'Outfit', sans-serif", 
                 fontWeight: 600, 
                 fill: '#000000', 
                 fontSize: 40,
                 originX: 'center', 
                 originY: 'center',
-                textAlign: 'left',
+                textAlign: 'center',
                 charSpacing: 0,
                 shadow: null,
-                objectCaching: false 
+                objectCaching: false,
+                editable: false // [V1.17] 默认不可编辑
             });
-            text.setControlsVisibility({ mt: false, mb: false, ml: false, mr: false });
-            canvas.add(text);
+            title.setControlsVisibility({ mt: false, mb: false, ml: false, mr: false });
+
+            const subText = new fabric.IText('右键或长按 唤出菜单', {
+                left: SCREEN_WIDTH / 2,
+                top: SCREEN_HEIGHT / 2 + 28, 
+                fontFamily: "'Noto Sans SC', sans-serif", 
+                fontWeight: 400, 
+                fill: '#999999', 
+                fontSize: 12,
+                originX: 'center', 
+                originY: 'center',
+                textAlign: 'center',
+                objectCaching: false,
+                editable: false // [V1.17] 默认不可编辑
+            });
+            subText.setControlsVisibility({ mt: false, mb: false, ml: false, mr: false, bl: false, br: false, tl: false, tr: false, mtr: false });
+
+            canvas.add(title);
+            canvas.add(subText);
             canvas.requestRenderAll();
         }
 
@@ -1437,18 +1842,23 @@
         function closeInfoModal() { infoModal.style.display = 'none'; }
 
         function executeClear() {
+            // 1. 清空对象，但不重置 screenHeight
             canvas.clear(); 
             bgRect = null;
             gridLines = [];
             screenCount = 1; 
             currentBgFill = '#ffffff'; 
+            
+            document.getElementById('color-picker-btn').style.backgroundColor = '#ffffff';
+            
             updateWorkspace();
-            
-            // V1.1 优化: 清空后添加默认文字
-            addDefaultText();
-            
+            addDefaultText(); 
             initViewport();
-            if(db) { const tx = db.transaction(STORE_NAME, "readwrite"); tx.objectStore(STORE_NAME).delete("last_session"); }
+            
+            // 2. 关键修改：不再删除 DB 记录，而是保存当前（空）状态
+            // 这样当前的 SCREEN_HEIGHT 会被持久化保存
+            saveState(); 
+            
             closeModal();
         }
 
@@ -1486,7 +1896,8 @@
                 textAlign: 'left',
                 charSpacing: 0,
                 shadow: null,
-                objectCaching: false 
+                objectCaching: false,
+                editable: false // [V1.17] 默认不可编辑
             });
             text.setControlsVisibility({ mt: false, mb: false, ml: false, mr: false });
             canvas.add(text);
@@ -1518,6 +1929,7 @@
 
         function changeBackgroundColor(color) {
             currentBgFill = color;
+            document.getElementById('color-picker-btn').style.backgroundColor = color; 
             if(bgRect) {
                 bgRect.set('fill', color);
                 canvas.requestRenderAll();
@@ -1589,7 +2001,7 @@
             
             const pageIndex = Math.floor((obj.left + obj.width * obj.scaleX / 2) / SCREEN_WIDTH);
             const screenCenterX = pageIndex * SCREEN_WIDTH + SCREEN_WIDTH / 2;
-            const screenCenterY = SCREEN_HEIGHT / 2;
+            const screenCenterY = SCREEN_HEIGHT / 2; 
 
             let snappedX = false, snappedY = false;
 
@@ -1647,7 +2059,7 @@
             const retina = canvas.getRetinaScaling();
             ctx.setTransform(vpt[0] * retina, vpt[1] * retina, vpt[2] * retina, vpt[3] * retina, vpt[4] * retina, vpt[5] * retina);
             ctx.lineWidth = 1;
-            ctx.strokeStyle = '#ff0077';
+            ctx.strokeStyle = '#5213dc';
             ctx.setLineDash([4, 4]);
             ctx.beginPath();
             renderingLines.forEach(l => { ctx.moveTo(l.x1, l.y1); ctx.lineTo(l.x2, l.y2); });
@@ -1665,14 +2077,12 @@
 
         function saveState() {
             if (!db || isInternalUpdate) return;
-            // V1.8: 隐藏状态文本
             canvas.clipPath = null;
             const json = canvas.toJSON(['isBackground', 'lockMovementX', 'lockMovementY', 'lockRotation', 'lockScalingX', 'lockScalingY', 'hasControls', 'borderColor']);
             updateWorkspace(); 
-            const saveData = { id: "autosave", canvas: json, screenCount: screenCount, bgFill: currentBgFill, updated: new Date().getTime() };
+            const saveData = { id: "autosave", canvas: json, screenCount: screenCount, bgFill: currentBgFill, screenHeight: SCREEN_HEIGHT, updated: new Date().getTime() };
             const tx = db.transaction(STORE_NAME, "readwrite");
             tx.objectStore(STORE_NAME).put(saveData, "last_session");
-            // V1.8: 移除 oncomplete 中的状态更新
         }
 
         function loadState() {
@@ -1680,18 +2090,35 @@
             tx.objectStore(STORE_NAME).get("last_session").onsuccess = (e) => {
                 const data = e.target.result;
                 if (data) {
-                    screenCount = data.screenCount || 1; 
+                    screenCount = data.screenCount || 1;
+                    if (data.screenHeight) {
+                        SCREEN_HEIGHT = data.screenHeight;
+                        // V1.09 Update: 动态设置加载后的按钮文字 (显示下一个状态)
+                        let label = "1:1"; // Default next for 9:16
+                        if (Math.abs(SCREEN_HEIGHT - 960) < 5) label = "1:1"; 
+                        else if (Math.abs(SCREEN_HEIGHT - 540) < 5) label = "3:4"; 
+                        else if (Math.abs(SCREEN_HEIGHT - 720) < 5) label = "9:16"; 
+                        ratioToggleBtn.innerText = label;
+                    }
+                    if (data.bgFill) {
+                        currentBgFill = data.bgFill;
+                        if (typeof currentBgFill === 'string') {
+                            document.getElementById('color-picker-btn').style.backgroundColor = currentBgFill;
+                            document.getElementById('bg-picker').value = currentBgFill;
+                        }
+                    }
+
                     canvas.loadFromJSON(data.canvas, () => {
                         const objectsToRemove = [];
                         canvas.getObjects().forEach(obj => {
                             if (obj.isBackground || (obj.type === 'rect' && obj.width >= SCREEN_WIDTH && obj.top === 0 && obj.left === 0)) {
-                                currentBgFill = obj.fill; objectsToRemove.push(obj); 
+                                if(!data.bgFill) currentBgFill = obj.fill; 
+                                objectsToRemove.push(obj); 
                             }
                         });
                         objectsToRemove.forEach(obj => canvas.remove(obj));
                         updateWorkspace(); 
                         
-                        // V3.0: 检测空状态并添加文字
                         let hasContent = false;
                         canvas.getObjects().forEach(obj => { 
                             if(obj === bgRect) return;
@@ -1706,9 +2133,13 @@
                                 obj.setControlsVisibility({ mt: false, mb: false, ml: false, mr: false });
                                 obj.set('shadow', null);
                                 obj.set('objectCaching', false);
+                                // [V1.17] 载入时强制不可编辑，防止旧数据干扰
+                                obj.set('editable', false);
                             }
                             if (obj.lockMovementX) {
-                                obj.set({ hasControls: false, borderColor: '#ff453a' });
+                                updateVisualState(obj, true);
+                            } else {
+                                updateVisualState(obj, false);
                             }
                         });
 
@@ -1721,9 +2152,12 @@
                         hideSplashScreen(); 
                     });
                 } else { 
+                    // 第一次加载（或数据丢失），强制 9:16，按钮显示 "1:1"
+                    SCREEN_HEIGHT = 960;
+                    ratioToggleBtn.innerText = "1:1";
+                    
                     updateWorkspace(); 
                     drawGrid(); 
-                    // V3.0: 新会话加默认文字
                     addDefaultText();
                     initViewport();
                     hideSplashScreen(); 
@@ -1734,17 +2168,17 @@
         function triggerAutoSave() {
             if(isInternalUpdate) return;
             clearTimeout(saveTimeout);
-            // V1.8: 隐藏修改中状态文本
             saveTimeout = setTimeout(saveState, 1000);
         }
 
         canvas.on('object:modified', triggerAutoSave); canvas.on('object:added', triggerAutoSave); canvas.on('object:removed', triggerAutoSave);
         
         function drawGrid() {
-            gridLines.forEach(l => canvas.remove(l)); gridLines = [];
+            gridLines.forEach(l => canvas.remove(l)); 
+            gridLines = [];
             for (let i = 1; i < screenCount; i++) {
                 const line = new fabric.Line([i * SCREEN_WIDTH, 0, i * SCREEN_WIDTH, SCREEN_HEIGHT], {
-                    stroke: '#007AFF', strokeWidth: 1, strokeDashArray: [5, 5], opacity: 0.3, selectable: false, evented: false, excludeFromExport: true
+                    stroke: '#5213dc', strokeWidth: 1, strokeDashArray: [5, 5], opacity: 0.3, selectable: false, evented: false, excludeFromExport: true
                 });
                 canvas.add(line); gridLines.push(line);
             }
@@ -1760,7 +2194,7 @@
             const originalHeight = canvas.height;
             canvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
             canvas.setWidth(screenCount * SCREEN_WIDTH);
-            canvas.setHeight(SCREEN_HEIGHT);
+            canvas.setHeight(SCREEN_HEIGHT); 
             gridLines.forEach(l => l.visible = false);
             canvas.clipPath = null; canvas.renderAll();
 
