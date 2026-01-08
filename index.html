@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     
-    <title>Spark Canvas v1.19</title>
+    <title>Spark Canvas v1.25</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%235213dc'/><path d='M50 20 C50 20 60 40 80 50 C60 60 50 80 50 80 C50 80 40 60 20 50 C40 40 50 20 50 20 Z' fill='white'/></svg>">
     
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -26,6 +26,7 @@
             
             --accent-color: #5213dc; 
             --danger-color: #FF453A; 
+            --success-color: #34C759;
             --text-main: #FFFFFF;
             --text-sub: #8E8E93;
         }
@@ -295,7 +296,8 @@
         .menu-item.delete:hover { background: var(--danger-color); color: white; }
         .menu-icon-span { width: 24px; text-align: center; margin-right: 10px; font-size: 18px; }
 
-        #menu-lock { display: none !important; }
+        /* [V1.20] Removed 'display: none !important' so it can be shown in menu */
+        #menu-lock {}
 
         .text-colors-container { display: flex; gap: 6px; padding: 8px 4px; justify-content: space-around; border-bottom: 1px solid rgba(255,255,255,0.08); margin-bottom: 6px; }
         
@@ -340,18 +342,19 @@
         .show-always { display: flex !important; }
         .show-header { display: block !important; }
 
-        #confirm-modal, #info-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); backdrop-filter: blur(8px); z-index: 3000; animation: fadeIn 0.3s; }
+        /* [V1.24] Added #success-modal to the group selector */
+        #confirm-modal, #info-modal, #success-modal { 
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+            background: rgba(0,0,0,0.6); backdrop-filter: blur(8px); z-index: 3000; animation: fadeIn 0.3s; 
+        }
 
         .modal-box { 
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
             background: #222; border: 1px solid #444; 
             border-radius: 16px; 
-            
-            /* [V1.19 UI Tweaks] Increased padding + increased width to maintain inner content width */
             padding: 35px; 
             width: 280px; 
             max-width: 85%; 
-            
             text-align: center; 
             box-shadow: 0 25px 60px rgba(0,0,0,0.6); 
             animation: popIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
@@ -360,7 +363,7 @@
 
         .modal-title { 
             font-size: 18px; font-weight: 700; 
-            margin-bottom: 32px; /* [V1.19] Increased margin below title */
+            margin-bottom: 32px; 
             color: white; letter-spacing: 0.5px; 
         }
         .modal-desc { font-size: 14px; color: #999; margin-bottom: 24px; line-height: 1.5; }
@@ -386,9 +389,8 @@
             display: flex; align-items: center; gap: 16px; 
             margin-bottom: 16px; 
             padding-bottom: 16px; 
-            border-bottom: 1px solid rgba(255,255,255,0.1); /* [V1.19] Added separator */
+            border-bottom: 1px solid rgba(255,255,255,0.1); 
         }
-        /* Last item has no border */
         .info-item:last-child {
             border-bottom: none;
             margin-bottom: 25px;
@@ -397,7 +399,6 @@
 
         .info-icon { font-size: 32px; width: 32px; text-align: center; color: var(--accent-color); flex-shrink: 0; }
         
-        /* [V1.19] Class for uniform text sizing in info modal */
         .info-text-line {
             display: block;
             font-size: 14px;
@@ -480,6 +481,18 @@
         </div>
     </div>
 
+    <div id="success-modal">
+        <div class="modal-box">
+            <div class="modal-title" style="margin-bottom: 25px;">
+                <i class="ri-checkbox-circle-fill" style="color: var(--success-color); font-size: 48px; display: block; margin-bottom: 12px;"></i>
+                图片已导出
+            </div>
+            <div class="modal-actions">
+                <button class="modal-btn primary" onclick="closeSuccessModal()">知道了</button>
+            </div>
+        </div>
+    </div>
+
     <div id="info-modal">
         <div class="modal-box">
             <div class="modal-title">Spark Canvas</div>
@@ -500,7 +513,10 @@
                 </div>
                 <div class="info-item">
                     <i class="info-icon ri-fullscreen-line"></i> 
-                    <span class="info-text-line">双击图片 <b>铺满/切换</b> 模式</span>
+                    <div>
+                        <span class="info-text-line">双击图片 <b>铺满/切换</b> 模式</span>
+                        <span class="info-text-line" style="font-size: 12px; opacity: 0.8;">双击图片后 <b>自动锁定</b>，再次双击 <b>解锁</b></span>
+                    </div>
                 </div>
             </div>
             <div class="modal-actions">
@@ -810,17 +826,26 @@
             // 排除无关对象
             if (!target || target.type !== 'image' || target === bgRect) return;
 
-            // --- 分支 A：解绑 (移除遮罩) ---
+            // --- 分支 A：解绑 (移除遮罩) -> 自动解锁 ---
             if (target.clipPath) {
                 target.set('clipPath', null);
+                
+                // [新增] 自动解锁
+                const unlockProps = { 
+                    lockMovementX: false, lockMovementY: false, 
+                    lockRotation: false, lockScalingX: false, lockScalingY: false 
+                };
+                target.set(unlockProps);
+                updateVisualState(target, false); // 恢复紫色边框和控制点
+
                 target.dirty = true;
                 canvas.requestRenderAll();
                 triggerAutoSave();
-                console.log("[Toggle] Mask Removed (Free Mode)");
+                console.log("[Toggle] Mask Removed (Free Mode) & Unlocked");
                 return;
             }
 
-            // --- 分支 B：铺满 (添加遮罩) ---
+            // --- 分支 B：铺满 (添加遮罩) -> 自动锁定 ---
             const screenW = SCREEN_WIDTH;
             const screenH = SCREEN_HEIGHT;
 
@@ -859,7 +884,14 @@
                 originY: 'center'
             });
 
-            // 4. 添加遮罩 (不可交互)
+            // 4. [新增] 自动锁定属性
+            const lockProps = { 
+                lockMovementX: true, lockMovementY: true, 
+                lockRotation: true, lockScalingX: true, lockScalingY: true 
+            };
+            target.set(lockProps);
+
+            // 5. 添加遮罩 (不可交互)
             const clipRect = new fabric.Rect({
                 left: pageIndex * screenW, top: 0,
                 width: screenW, height: screenH,
@@ -870,11 +902,14 @@
             
             target.set('clipPath', clipRect);
 
-            // 5. 刷新
+            // 6. 更新视觉状态 (变为红色边框，无控制点)
+            updateVisualState(target, true);
+
+            // 7. 刷新
             target.setCoords();
             canvas.requestRenderAll();
             triggerAutoSave();
-            console.log(`[Toggle] Cover Mode | Scale: ${finalScale.toFixed(4)}`);
+            console.log(`[Toggle] Cover Mode & Locked | Scale: ${finalScale.toFixed(4)}`);
         }
 
         // ==========================================
@@ -1620,8 +1655,7 @@
                 'spacing-up', 'spacing-down', 
                 'line-height-up', 'line-height-down', 
                 'align-left', 'align-center', 'align-right',
-                'top', 'bottom', 'up', 'down',
-                'lock-toggle' 
+                'top', 'bottom', 'up', 'down' 
             ];
             
             if (!keepOpen.includes(action)) {
@@ -1837,6 +1871,9 @@
 
         function showModal() { confirmModal.style.display = 'block'; }
         function closeModal() { confirmModal.style.display = 'none'; }
+        
+        function showSuccessModal() { document.getElementById('success-modal').style.display = 'block'; }
+        function closeSuccessModal() { document.getElementById('success-modal').style.display = 'none'; }
         
         function showInfoModal() { infoModal.style.display = 'block'; }
         function closeInfoModal() { infoModal.style.display = 'none'; }
@@ -2216,6 +2253,7 @@
                         await navigator.share({ files: files, title: 'Spark Canvas', text: '由 Spark Canvas 生成' });
                         shareSuccess = true;
                         statusIndicator.innerText = "已完成"; 
+                        showSuccessModal(); 
                     }
                 }
             } catch (err) { console.log("Share skipped/cancelled", err); }
@@ -2229,6 +2267,7 @@
                     if (i < blobs.length - 1) await new Promise(r => setTimeout(r, 1500));
                 }
                 statusIndicator.innerText = "下载完成"; 
+                showSuccessModal(); 
             }
             
             canvas.setViewportTransform(originalVpt); canvas.setWidth(originalWidth); canvas.setHeight(originalHeight);
